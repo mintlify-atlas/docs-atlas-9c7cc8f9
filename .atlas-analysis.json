@@ -1,0 +1,99 @@
+{
+  "projectType": "general",
+  "projectName": "fCavEX",
+  "projectDescription": "A Wii homebrew game recreating Minecraft Beta 1.7.3 with enhanced features and performance optimizations",
+  "theme": "aspen",
+  "primaryColor": "#7B3F00",
+  "lightColor": "#A0522D",
+  "darkColor": "#4A2511",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "introduction",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Building",
+            "pages": [
+              "building/dependencies",
+              "building/wii",
+              "building/pc",
+              "building/video-settings"
+            ]
+          },
+          {
+            "group": "Gameplay",
+            "pages": [
+              "gameplay/controls",
+              "gameplay/features",
+              "gameplay/blocks",
+              "gameplay/items",
+              "gameplay/health-system"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/config-file",
+              "configuration/input-mapping"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Development",
+        "groups": [
+          {
+            "group": "Architecture",
+            "pages": [
+              "dev/architecture",
+              "dev/world-system",
+              "dev/rendering",
+              "dev/block-system",
+              "dev/entity-system"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "dev/changelog",
+              "dev/differences-from-cavex"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "60fps performance on Nintendo Wii hardware",
+    "Beta 1.7.3 block recreation with nearly all blocks implemented",
+    "Compile-time video settings for performance optimization",
+    "Health system with damage, eating, and respawning",
+    "Cross-platform support (Wii and PC with OpenGL 2.0)",
+    "Working doors, trapdoors, chests, furnaces, and signs",
+    "Ambient occlusion and correct light propagation",
+    "Compatible with Beta world saves",
+    "Custom inventory and crafting system",
+    "Iron chests with double capacity"
+  ],
+  "publicApiSurface": [
+    "blocks_init() - Initialize block system",
+    "items_init() - Initialize item system",
+    "world_create() - Create world instance",
+    "chunk_mesher_init() - Initialize chunk meshing",
+    "entity_* functions - Entity management",
+    "block_* structures - Individual block implementations",
+    "item_* structures - Individual item implementations",
+    "config_create() - Load configuration from JSON",
+    "gfx_* functions - Graphics platform abstraction",
+    "input_* functions - Input handling",
+    "server_local_* - Local server logic",
+    "client_interface_* - Client-side game logic"
+  ]
+}
