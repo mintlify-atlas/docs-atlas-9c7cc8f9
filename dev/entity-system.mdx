@@ -1,0 +1,439 @@
+---
+title: Entity System
+description: Entity system architecture and implementation
+---
+
+The entity system handles all dynamic objects in the world including players, items, and monsters. Entities use a data-oriented design with polymorphic behavior through function pointers.
+
+## Entity Structure
+
+From `source/entity/entity.h:37-74`:
+
+```c
+struct entity {
+    uint32_t id;                // Unique entity ID
+    bool on_server;             // Server-side vs client-side
+    void* world;                // World reference
+    int delay_destroy;          // Ticks until removal
+    short health;
+    
+    // Transform
+    vec3 pos;                   // Current position
+    vec3 pos_old;              // Previous position (for interpolation)
+    vec3 vel;                   // Velocity
+    vec2 orient;                // Yaw, pitch
+    vec2 orient_old;           // Previous orientation
+    bool on_ground;
+    
+    vec3 network_pos;          // Last synced network position
+    
+    // Virtual functions
+    bool (*tick_client)(struct entity*);
+    bool (*tick_server)(struct entity*, struct server_local*);
+    void (*render)(struct entity*, mat4, float);
+    void (*teleport)(struct entity*, vec3);
+    
+    // Type-specific data
+    enum entity_type type;
+    union entity_data {
+        struct entity_local_player {
+            int jump_ticks;
+            bool capture_input;
+        } local_player;
+        
+        struct entity_item {
+            struct item_data item;
+            int age;
+        } item;
+        
+        struct entity_monster {
+            int id;
+            int frame;
+            int frame_time_left;
+        } monster;
+    } data;
+};
+```
+
+## Entity Types
+
+```c
+enum entity_type {
+    ENTITY_LOCAL_PLAYER,    // The player
+    ENTITY_ITEM,            // Dropped item
+    ENTITY_MONSTER,         // Hostile mob
+};
+```
+
+## Entity Dictionary
+
+Entities are stored in a dictionary keyed by ID:
+
+```c
+DICT_DEF2(dict_entity, uint32_t, M_BASIC_OPLIST, 
+          struct entity*, M_POD_OPLIST)
+
+dict_entity_t gstate.entities;
+
+// Generate unique ID
+uint32_t entity_gen_id(dict_entity_t dict) {
+    uint32_t id = rand();
+    while(dict_entity_get(dict, id))
+        id = rand();
+    return id;
+}
+```
+
+## Entity Lifecycle
+
+### Creation
+
+```c
+// Local player
+void entity_local_player(uint32_t id, struct entity* e, struct world* w) {
+    entity_default_init(e, false, w);
+    
+    e->id = id;
+    e->type = ENTITY_LOCAL_PLAYER;
+    e->health = 20;
+    
+    e->tick_client = entity_local_player_tick;
+    e->tick_server = NULL;
+    e->render = NULL;  // First-person, no rendering
+    e->teleport = entity_default_teleport;
+    
+    e->data.local_player.jump_ticks = 0;
+    e->data.local_player.capture_input = true;
+}
+
+// Dropped item
+void entity_item(uint32_t id, struct entity* e, bool server, 
+                 void* world, struct item_data it) {
+    entity_default_init(e, server, world);
+    
+    e->id = id;
+    e->type = ENTITY_ITEM;
+    e->health = 5 * 20;  // 5 seconds
+    
+    e->tick_client = entity_item_tick;
+    e->tick_server = entity_item_tick_server;
+    e->render = entity_item_render;
+    e->teleport = entity_default_teleport;
+    
+    e->data.item.item = it;
+    e->data.item.age = 0;
+}
+
+// Monster
+void entity_monster(uint32_t id, struct entity* e, bool server,
+                    void* world, int monster_id) {
+    entity_default_init(e, server, world);
+    
+    e->id = id;
+    e->type = ENTITY_MONSTER;
+    e->health = monsters[monster_id].max_health;
+    
+    e->tick_client = entity_monster_tick;
+    e->tick_server = entity_monster_tick_server;
+    e->render = entity_monster_render;
+    e->teleport = entity_default_teleport;
+    
+    e->data.monster.id = monster_id;
+    e->data.monster.frame = monsters[monster_id].frame_init;
+    e->data.monster.frame_time_left = frames[e->data.monster.frame].length;
+}
+```
+
+### Destruction
+
+```c
+// Marked for delayed destruction
+e->delay_destroy = 20;  // Destroy in 1 second (20 ticks)
+
+// Cleaned up during tick
+if(e->delay_destroy > 0) {
+    e->delay_destroy--;
+    if(e->delay_destroy == 0) {
+        dict_entity_erase(gstate.entities, e->id);
+        free(e);
+    }
+}
+```
+
+## Entity Updates
+
+### Client Tick
+
+Called every game tick (50ms) from `source/main.c:129`:
+
+```c
+void entities_client_tick(dict_entity_t dict) {
+    dict_entity_it_t it;
+    dict_entity_it(it, dict);
+    
+    while(!dict_entity_end_p(it)) {
+        struct entity* e = dict_entity_ref(it)->value;
+        
+        // Store old state for interpolation
+        glm_vec3_copy(e->pos, e->pos_old);
+        glm_vec2_copy(e->orient, e->orient_old);
+        
+        // Call entity-specific tick
+        bool alive = e->tick_client(e);
+        
+        if(!alive)
+            e->delay_destroy = 1;
+        
+        // Handle delayed destruction
+        if(e->delay_destroy > 0) {
+            e->delay_destroy--;
+            if(e->delay_destroy == 0) {
+                dict_entity_erase(dict, it);
+                free(e);
+                continue;
+            }
+        }
+        
+        dict_entity_next(it);
+    }
+}
+```
+
+### Default Physics Tick
+
+```c
+bool entity_default_client_tick(struct entity* e) {
+    // Apply gravity
+    if(!e->on_ground)
+        e->vel[1] -= 0.08F;
+    
+    // Apply drag
+    e->vel[0] *= 0.91F;
+    e->vel[1] *= 0.98F;
+    e->vel[2] *= 0.91F;
+    
+    // Movement with collision
+    vec3 new_pos;
+    glm_vec3_add(e->pos, e->vel, new_pos);
+    
+    struct AABB bbox;
+    // ... compute entity bounding box
+    
+    bool collision_xz = false;
+    entity_try_move(e, new_pos, e->vel, &bbox, 0, &collision_xz, &e->on_ground);
+    entity_try_move(e, new_pos, e->vel, &bbox, 1, &collision_xz, &e->on_ground);
+    entity_try_move(e, new_pos, e->vel, &bbox, 2, &collision_xz, &e->on_ground);
+    
+    glm_vec3_copy(new_pos, e->pos);
+    
+    return true;  // Still alive
+}
+```
+
+## Collision Detection
+
+From `source/entity/entity.h:123-134`:
+
+```c
+void entity_try_move(struct entity* e, vec3 pos, vec3 vel, 
+                     struct AABB* bbox, size_t coord,
+                     bool* collision_xz, bool* on_ground) {
+    // Move along one axis with collision resolution
+    vec3 test_pos;
+    glm_vec3_copy(pos, test_pos);
+    
+    // Binary search for collision point
+    float step = vel[coord];
+    float threshold;
+    
+    struct AABB test_bbox = *bbox;
+    aabb_translate(&test_bbox, test_pos[0], test_pos[1], test_pos[2]);
+    
+    if(entity_intersection_threshold(e, &test_bbox, e->pos, test_pos, 
+                                     &threshold)) {
+        // Collision detected, move to threshold
+        pos[coord] = e->pos[coord] + step * threshold;
+        vel[coord] = 0;
+        
+        if(coord == 1 && step < 0)
+            *on_ground = true;
+        else if(coord != 1)
+            *collision_xz = true;
+    } else {
+        pos[coord] = test_pos[coord];
+    }
+}
+
+bool entity_intersection(struct entity* e, struct AABB* a,
+                         bool (*test)(struct AABB* entity,
+                                     struct block_info* blk_info)) {
+    // Test AABB against all blocks in range
+    w_coord_t min_x = floorf(a->x1);
+    w_coord_t min_y = floorf(a->y1);
+    w_coord_t min_z = floorf(a->z1);
+    w_coord_t max_x = ceilf(a->x2);
+    w_coord_t max_y = ceilf(a->y2);
+    w_coord_t max_z = ceilf(a->z2);
+    
+    for(w_coord_t x = min_x; x < max_x; x++) {
+        for(w_coord_t z = min_z; z < max_z; z++) {
+            for(w_coord_t y = min_y; y < max_y; y++) {
+                struct block_data blk;
+                if(!entity_get_block(e, x, y, z, &blk))
+                    continue;
+                
+                if(blocks[blk.type]) {
+                    struct block_info info = {
+                        .block = &blk,
+                        .x = x, .y = y, .z = z,
+                    };
+                    
+                    if(test && test(a, &info))
+                        return true;
+                }
+            }
+        }
+    }
+    
+    return false;
+}
+```
+
+## Entity Rendering
+
+Called with interpolation from `source/main.c:231`:
+
+```c
+void entities_client_render(dict_entity_t dict, struct camera* c,
+                            float tick_delta) {
+    dict_entity_it_t it;
+    dict_entity_it(it, dict);
+    
+    while(!dict_entity_end_p(it)) {
+        struct entity* e = dict_entity_ref(it)->value;
+        
+        if(e->render)
+            e->render(e, c->view, tick_delta);
+        
+        dict_entity_next(it);
+    }
+}
+```
+
+### Interpolation
+
+Smooth rendering between ticks:
+
+```c
+void entity_item_render(struct entity* e, mat4 view, float tick_delta) {
+    // Interpolate position
+    vec3 render_pos;
+    glm_vec3_lerp(e->pos_old, e->pos, tick_delta, render_pos);
+    
+    // Interpolate orientation
+    vec2 render_orient;
+    glm_vec2_lerp(e->orient_old, e->orient, tick_delta, render_orient);
+    
+    // Render at interpolated transform
+    mat4 model;
+    glm_translate_make(model, render_pos);
+    glm_rotate_y(model, render_orient[0]);
+    
+    mat4 model_view;
+    glm_mat4_mul(view, model, model_view);
+    
+    // Draw item model
+    render_item_entity(&e->data.item.item, model_view);
+    
+    // Draw shadow
+    entity_shadow(e, &bbox, view);
+}
+```
+
+## Monster System
+
+Monsters use a state machine with frames:
+
+```c
+struct monster_frame {
+    int x, y;              // Texture atlas position
+    int length;            // Duration in ticks
+    void (*action)();      // Frame action (attack, move, etc.)
+    int next_frame;        // Next frame ID
+};
+
+struct monster {
+    int max_health;
+    int speed;
+    int width, height;     // Texture size
+    int frame_init;        // Idle animation
+    int frame_alert;       // Spotted player
+    int frame_hurt;        // Taking damage
+    int frame_melee;       // Melee attack
+    int frame_attack;      // Ranged attack
+    int frame_death;       // Death animation
+};
+
+extern struct monster_frame frames[256];
+extern struct monster monsters[];
+```
+
+### Monster Tick
+
+```c
+bool entity_monster_tick(struct entity* e) {
+    // Update animation frame
+    e->data.monster.frame_time_left--;
+    if(e->data.monster.frame_time_left <= 0) {
+        int current = e->data.monster.frame;
+        e->data.monster.frame = frames[current].next_frame;
+        e->data.monster.frame_time_left = frames[e->data.monster.frame].length;
+        
+        // Execute frame action
+        if(frames[current].action)
+            frames[current].action(e);
+    }
+    
+    // Default physics
+    return entity_default_client_tick(e);
+}
+```
+
+## Local Player
+
+The local player entity is special:
+
+```c
+struct entity* gstate.local_player;
+
+void camera_attach(struct camera* c, struct entity* e, 
+                   float tick_delta, float dt) {
+    if(!e) return;
+    
+    // Interpolate camera to player position
+    vec3 render_pos;
+    glm_vec3_lerp(e->pos_old, e->pos, tick_delta, render_pos);
+    
+    c->x = render_pos[0];
+    c->y = render_pos[1] + 1.62F;  // Eye height
+    c->z = render_pos[2];
+    
+    // Apply player orientation
+    c->rx = e->orient[0];
+    c->ry = e->orient[1];
+}
+```
+
+## Water Detection
+
+```c
+bool entity_local_player_block_collide(vec3 pos, struct block_info* blk_info) {
+    // Check if player is in water
+    if(blk_info->block->type == BLOCK_WATER_FLOW ||
+       blk_info->block->type == BLOCK_WATER_STILL) {
+        gstate.in_water = true;
+        return false;  // Don't collide with water
+    }
+    return true;  // Collide with solid blocks
+}
+```

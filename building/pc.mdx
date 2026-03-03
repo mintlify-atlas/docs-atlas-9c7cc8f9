@@ -1,0 +1,258 @@
+---
+title: Building for PC/Linux
+description: Build fCavEX for PC and Linux with OpenGL support
+---
+
+## Prerequisites
+
+Before building for PC, ensure you have:
+
+1. Completed the [dependency setup](/building/dependencies)
+2. Installed system libraries (zlib, glfw3, glew)
+3. CMake 3.14 or higher
+4. GCC or compatible C compiler
+5. OpenGL 2.0 support
+
+## Install System Dependencies
+
+Install the required libraries using your system package manager:
+
+<CodeGroup>
+```bash Ubuntu/Debian
+sudo apt-get install build-essential cmake zlib1g-dev libglfw3-dev libglew-dev
+```
+
+```bash Fedora/RHEL
+sudo dnf install gcc cmake zlib-devel glfw-devel glew-devel
+```
+
+```bash Arch Linux
+sudo pacman -S base-devel cmake zlib glfw-x11 glew
+```
+</CodeGroup>
+
+## Build Process
+
+<Steps>
+  <Step title="Navigate to source directory">
+    ```bash
+    cd /path/to/fcavex/source
+    ```
+  </Step>
+  
+  <Step title="Create build directory">
+    ```bash
+    mkdir build_pc
+    cd build_pc
+    ```
+  </Step>
+  
+  <Step title="Run CMake">
+    Configure the project:
+    
+    ```bash
+    cmake ..
+    ```
+  </Step>
+  
+  <Step title="Compile">
+    Build the executable:
+    
+    ```bash
+    make
+    ```
+    
+    This will create the `cavex` executable in the build directory.
+  </Step>
+</Steps>
+
+## Build Configuration
+
+The PC build uses CMake with the following configuration (from `CMakeLists.txt`):
+
+### Compiler Flags
+
+```cmake
+add_compile_options(-O3 -march=native -g)
+```
+
+- **`-O3`** - Maximum optimization level
+- **`-march=native`** - Optimize for your CPU architecture
+- **`-g`** - Include debug symbols
+
+### Platform Definitions
+
+```cmake
+target_compile_definitions(cavex PRIVATE PLATFORM_PC CGLM_ALL_UNALIGNED)
+```
+
+- **`PLATFORM_PC`** - Enables PC-specific code paths
+- **`CGLM_ALL_UNALIGNED`** - cglm configuration for compatibility
+
+### Linked Libraries
+
+From `CMakeLists.txt:179`:
+
+```cmake
+target_link_libraries(cavex 
+  ${CMAKE_THREAD_LIBS_INIT} 
+  ZLIB::ZLIB 
+  glfw 
+  GLEW::GLEW 
+  OpenGL::GL 
+  m
+)
+```
+
+## Running the Game
+
+<Steps>
+  <Step title="Copy shader files">
+    The PC version requires fragment and vertex shaders. Copy them from the `resources/` directory:
+    
+    ```bash
+    cp ../resources/*.glsl .
+    ```
+    
+    Place these shader files next to your `assets/` directory.
+  </Step>
+  
+  <Step title="Set up assets directory">
+    Ensure your directory structure looks like this:
+    
+    ```
+    build_pc/
+    ├── cavex (executable)
+    ├── assets/
+    │   ├── terrain.png
+    │   ├── items.png
+    │   ├── anim.png
+    │   ├── default.png
+    │   ├── gui.png
+    │   └── gui2.png
+    ├── saves/
+    │   └── world/
+    ├── config.json
+    ├── fragment_shader.glsl
+    └── vertex_shader.glsl
+    ```
+  </Step>
+  
+  <Step title="Launch the game">
+    ```bash
+    ./cavex
+    ```
+  </Step>
+</Steps>
+
+## Controls
+
+The PC version uses keyboard and mouse controls:
+
+- **Mouse** - Look around
+- **WASD** - Movement
+- **Space** - Jump
+- **Shift** - Sneak
+- **E** - Inventory
+- **Escape** - Pause menu
+- **Mouse buttons** - Break/place blocks
+
+<Note>
+For detailed controls, check the `controls.md` file in the source repository.
+</Note>
+
+## Advanced Build Options
+
+### Custom Compiler
+
+To use a specific compiler:
+
+```bash
+CXX=clang++ CC=clang cmake ..
+make
+```
+
+### Build Types
+
+<CodeGroup>
+```bash Release (default)
+cmake -DCMAKE_BUILD_TYPE=Release ..
+make
+```
+
+```bash Debug
+cmake -DCMAKE_BUILD_TYPE=Debug ..
+make
+```
+
+```bash Release with Debug Info
+cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
+make
+```
+</CodeGroup>
+
+### Link-Time Optimization
+
+LTO is enabled by default (from `CMakeLists.txt:177`):
+
+```cmake
+set_property(TARGET cavex PROPERTY INTERPROCEDURAL_OPTIMIZATION True)
+```
+
+This provides additional optimization at link time for better performance.
+
+## Performance Considerations
+
+### Default Window Resolution
+
+The default window size is defined in `source/graphics/gfx_settings.h:47-48`:
+
+```c
+#define GFX_PC_WINDOW_WIDTH 640
+#define GFX_PC_WINDOW_HEIGHT 400
+```
+
+You can modify these values before building. See [Video Settings](/building/video-settings) for details.
+
+### Optimization Tips
+
+<Tip>
+For maximum performance, ensure you're building with `-march=native` to take advantage of your CPU's instruction set. The default CMake configuration already includes this flag.
+</Tip>
+
+- Lower resolution improves performance on integrated GPUs
+- Disable `GFX_FANCY_LIQUIDS` for better FPS on low-end GPUs
+- Adjust `GFX_GUI_SCALE` based on your resolution
+
+## Troubleshooting
+
+### CMake can't find libraries
+
+Make sure development packages are installed:
+
+```bash
+ldconfig -p | grep -E '(glfw|glew|GL)'
+```
+
+### Missing shaders
+
+If the game fails to launch with shader errors, ensure the `.glsl` files from `resources/` are in the same directory as the executable.
+
+### OpenGL version errors
+
+fCavEX requires OpenGL 2.0 or higher. Check your driver:
+
+```bash
+glxinfo | grep "OpenGL version"
+```
+
+## Cleaning Build Files
+
+To rebuild from scratch:
+
+```bash
+cd build_pc
+rm -rf *
+cmake ..
+make
+```

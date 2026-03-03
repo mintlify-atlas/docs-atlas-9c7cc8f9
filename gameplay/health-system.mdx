@@ -1,0 +1,178 @@
+---
+title: Health System
+description: Health, damage, oxygen, eating mechanics, and death in fCavEX
+---
+
+fCavEX features a complete health system with damage, healing through food, oxygen management, and death/respawn mechanics.
+
+## Health Points
+
+The player has **160 health points** total, displayed as **10 hearts** in the HUD.
+
+- **Maximum health**: 160 HP (10 hearts)
+- **1 heart** = 16 health points
+- **Starting health**: 160 HP (full health on spawn)
+- **Respawn health**: 80 HP (5 hearts, half of max)
+
+<Info>
+  This differs from vanilla Minecraft Beta 1.7.3, which has 20 health (10 hearts = 2 HP per heart). Loading vanilla saves will result in only 1 heart initially - eat food to restore health.
+</Info>
+
+## Damage Sources
+
+### Fall Damage
+
+Falling from heights damages the player based on fall distance.
+
+- **Damage formula**: `(fall_distance - 3) × 16 HP` per block beyond 3 blocks
+- **Safe fall height**: 3 blocks (no damage)
+- **4 block fall**: 16 HP (1 heart)
+- **5 block fall**: 32 HP (2 hearts)
+- **10 block fall**: 112 HP (7 hearts)
+
+<Warning>
+  Falls of 13+ blocks will kill a player at full health (160 HP).
+</Warning>
+
+**Fall damage is prevented by:**
+- Landing in water
+- Being underwater when the fall starts
+
+### Lava Damage
+
+Swimming in lava causes continuous damage.
+
+- **Damage**: 32 HP (2 hearts) every 8 game ticks
+- **Frequency**: Approximately 4 times per second
+- **Lava detection**: Checks player position and block below
+
+<Tip>
+  Lava damage is extremely high - avoid swimming in lava without fire resistance (not yet implemented).
+</Tip>
+
+### Drowning Damage
+
+When underwater, an oxygen bar appears above the health bar. When oxygen runs out, the player begins drowning.
+
+- **Maximum oxygen**: 351 ticks (approximately 17.5 seconds)
+- **Oxygen depletion**: 1 tick per game tick while underwater
+- **Oxygen restoration**: Instant when surfacing
+- **Drowning damage**: 16 HP (1 heart) every 32 ticks when oxygen ≤ threshold
+- **Damage frequency**: Approximately every 1.6 seconds
+
+**Oxygen mechanics:**
+- Oxygen bar displayed only when underwater
+- Oxygen depletes at constant rate while submerged
+- Oxygen instantly refills when returning to air
+- Drowning damage begins when oxygen fully depleted
+
+### Raw Food Damage
+
+Eating raw meat damages the player.
+
+- **Raw Porkchop**: -16 HP (1 heart)
+- **Raw Fish**: -16 HP (1 heart)
+
+<Warning>
+  Always cook meat in a furnace before eating to gain health instead of losing it.
+</Warning>
+
+## Healing Through Food
+
+Food can only be eaten when the player is **below maximum health**. Right-click with food in hand to eat it.
+
+### Food Healing Values
+
+| Food | Healing | Hearts Restored |
+|------|:-------:|:---------------:|
+| Apple | 32 HP | 2 hearts |
+| Golden Apple | Full Health | 10 hearts (to max) |
+| Bread | 40 HP | 2.5 hearts |
+| Cooked Porkchop | 64 HP | 4 hearts |
+| Cooked Fish | 48 HP | 3 hearts |
+| Mushroom Stew | 80 HP | 5 hearts |
+| Raw Porkchop | **-16 HP** | **-1 heart** |
+| Raw Fish | **-16 HP** | **-1 heart** |
+
+<CardGroup cols={2}>
+  <Card title="Best Healing" icon="bowl-food">
+    Mushroom Stew (80 HP / 5 hearts)
+  </Card>
+  <Card title="Full Heal" icon="apple-whole">
+    Golden Apple (restores to 160 HP)
+  </Card>
+  <Card title="Easy Food" icon="bread-slice">
+    Bread (40 HP / 2.5 hearts)
+  </Card>
+  <Card title="Avoid" icon="meat">
+    Raw meat damages you!
+  </Card>
+</CardGroup>
+
+### Food Restrictions
+
+- Food **cannot be eaten at full health** (160 HP)
+- Eating food is instant (no eating animation)
+- Food items have max stack of 1 (except cookies: 8 stack)
+- Mushroom stew returns an empty bowl after eating
+
+## Death and Respawning
+
+When health reaches **0 HP**, the player dies.
+
+### Death Consequences
+
+1. **All items are dropped** at death location
+2. **Instant respawn** at world spawn point
+3. **Respawn health**: 80 HP (5 hearts, half of maximum)
+4. **No death screen or delay**
+
+<Warning>
+  Items dropped on death can despawn or be destroyed by lava/fire. Return to your death location quickly to recover items.
+</Warning>
+
+### Spawn Points
+
+- **World spawn**: Original spawn point set when world was created
+- **Beds**: Present in game but do not set spawn point (not yet functional)
+
+## Health Management Tips
+
+<CardGroup cols={2}>
+  <Card title="Always Carry Food" icon="utensils">
+    Keep cooked food in your hotbar for emergencies
+  </Card>
+  <Card title="Cook Raw Meat" icon="fire-burner">
+    Use furnaces to cook porkchops and fish before eating
+  </Card>
+  <Card title="Avoid High Falls" icon="person-falling">
+    Falls over 13 blocks are lethal at full health
+  </Card>
+  <Card title="Watch Oxygen" icon="water">
+    Surface before oxygen bar depletes underwater
+  </Card>
+  <Card title="Lava is Deadly" icon="fire">
+    Lava damage is extremely high - avoid at all costs
+  </Card>
+  <Card title="Stock Mushroom Stew" icon="bowl-food">
+    Best healing food (5 hearts)
+  </Card>
+</CardGroup>
+
+## Health Display
+
+The health bar is displayed in the game HUD:
+
+- **10 heart icons** representing 160 total HP
+- **Oxygen bar** appears above health when underwater
+- **Hearts decrease** as health is lost
+- **Visual feedback** for damage and healing
+
+## Source Code References
+
+Health mechanics are implemented in:
+
+- Health constants: `source/network/server_interface.h:189-190`
+- Damage system: `source/network/server_local.c:600-638`
+- Oxygen mechanics: `source/entity/entity_local_player.c:219-224`
+- Food items: `source/item/items/item_*.c`

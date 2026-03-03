@@ -1,0 +1,156 @@
+---
+title: Dependencies
+description: Required libraries and setup for building fCavEX
+---
+
+## Required Libraries
+
+The following libraries are required for building fCavEX on any platform. You need to download these libraries and place their source files in the specified directories.
+
+<Note>
+All library paths are relative to the `source/` directory in the fCavEX repository.
+</Note>
+
+### LodePNG
+
+**Purpose:** PNG image loading and encoding
+
+<Steps>
+  <Step title="Download LodePNG">
+    Get the latest version from [https://github.com/lvandeve/lodepng](https://github.com/lvandeve/lodepng)
+  </Step>
+  
+  <Step title="Copy files">
+    Place `lodepng.h` and `lodepng.c` into `source/lodepng/`
+  </Step>
+</Steps>
+
+### cglm
+
+**Purpose:** OpenGL mathematics library for C
+
+<Steps>
+  <Step title="Download cglm">
+    Get the latest version from [https://github.com/recp/cglm](https://github.com/recp/cglm)
+  </Step>
+  
+  <Step title="Copy files">
+    Copy the entire `include/cglm/` directory to `source/cglm/`
+  </Step>
+</Steps>
+
+### cNBT
+
+**Purpose:** NBT (Named Binary Tag) format parser for Minecraft world files
+
+<Steps>
+  <Step title="Download cNBT">
+    Get the latest version from [https://github.com/chmod222/cNBT](https://github.com/chmod222/cNBT)
+  </Step>
+  
+  <Step title="Copy files">
+    Place the following files into `source/cNBT/`:
+    - `buffer.c`
+    - `buffer.h`
+    - `list.h`
+    - `nbt_loading.c`
+    - `nbt_parsing.c`
+    - `nbt_treeops.c`
+    - `nbt_util.c`
+    - `nbt.h`
+  </Step>
+</Steps>
+
+### parson
+
+**Purpose:** JSON parser for configuration files
+
+<Steps>
+  <Step title="Download parson">
+    Get the latest version from [https://github.com/kgabis/parson](https://github.com/kgabis/parson)
+  </Step>
+  
+  <Step title="Copy files">
+    Place `parson.h` and `parson.c` into `source/parson/`
+  </Step>
+</Steps>
+
+### M\*LIB
+
+**Purpose:** Generic container library for C
+
+<Steps>
+  <Step title="Download M*LIB">
+    Get the latest version from [https://github.com/P-p-H-d/mlib](https://github.com/P-p-H-d/mlib)
+  </Step>
+  
+  <Step title="Add to include path">
+    Copy any root `*.h` header files to your compiler's include path
+  </Step>
+</Steps>
+
+## Platform-Specific Dependencies
+
+### Wii Platform
+
+For building on Wii, you need:
+
+- **devkitPro toolchain** - Wii/GameCube development environment
+- **wii-dev** - Wii development libraries
+- **ppc-zlib** - zlib compression library for PowerPC
+
+Install using devkitPro's package manager:
+
+```bash
+dkp-pacman -S wii-dev ppc-zlib
+```
+
+### PC/Linux Platform
+
+For building on PC, install these system libraries:
+
+- **zlib** - Compression library
+- **glfw3** - OpenGL framework (version 3.3 or higher)
+- **glew** - OpenGL Extension Wrangler Library
+- **OpenGL 2.0** - Graphics API support
+
+<CodeGroup>
+```bash Ubuntu/Debian
+sudo apt-get install zlib1g-dev libglfw3-dev libglew-dev
+```
+
+```bash Fedora/RHEL
+sudo dnf install zlib-devel glfw-devel glew-devel
+```
+
+```bash Arch Linux
+sudo pacman -S zlib glfw-x11 glew
+```
+</CodeGroup>
+
+## Directory Structure
+
+After setting up all dependencies, your source directory should look like this:
+
+```
+source/
+├── cglm/
+│   └── (cglm header files)
+├── cNBT/
+│   ├── buffer.c
+│   ├── buffer.h
+│   ├── list.h
+│   ├── nbt.h
+│   └── ...
+├── lodepng/
+│   ├── lodepng.c
+│   └── lodepng.h
+├── parson/
+│   ├── parson.c
+│   └── parson.h
+└── (fCavEX source files)
+```
+
+<Note>
+Ensure all dependencies are properly installed before proceeding to build for your target platform.
+</Note>

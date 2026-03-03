@@ -1,0 +1,140 @@
+---
+title: Game Features
+description: Overview of gameplay features in fCavEX
+---
+
+fCavEX is an experimental fork of CavEX that recreates Minecraft Beta 1.7.3 for the Nintendo Wii. This page provides an overview of the implemented features.
+
+## Performance
+
+<CardGroup cols={2}>
+  <Card title="60 FPS on Wii" icon="gauge-high">
+    Great performance on Wii hardware with optimized rendering
+  </Card>
+  <Card title="5 Chunk Render Distance" icon="eye">
+    Balanced view distance for smooth gameplay
+  </Card>
+  <Card title="Optimized Rendering" icon="cube">
+    Improved leaf rendering and 2D item entities for better performance
+  </Card>
+  <Card title="Compile-Time Settings" icon="sliders">
+    Customizable graphics settings via `gfx_settings.h`
+  </Card>
+</CardGroup>
+
+## World Features
+
+<CardGroup cols={2}>
+  <Card title="Beta 1.7.3 Worlds" icon="map">
+    Load existing Beta 1.7.3 world saves
+  </Card>
+  <Card title="Light Propagation" icon="lightbulb">
+    Correct light propagation system
+  </Card>
+  <Card title="Ambient Occlusion" icon="cube">
+    Smooth lighting on block faces
+  </Card>
+  <Card title="Nearly All Blocks" icon="cubes">
+    Almost all blocks from Beta 1.7.3 (except redstone-related)
+  </Card>
+</CardGroup>
+
+## Player Mechanics
+
+<CardGroup cols={2}>
+  <Card title="Health System" icon="heart">
+    160 health points (10 hearts), damage, eating, and dying
+  </Card>
+  <Card title="Oxygen & Drowning" icon="water">
+    Oxygen bar when underwater, drowning damage
+  </Card>
+  <Card title="Fall Damage" icon="person-falling">
+    Realistic fall damage based on distance
+  </Card>
+  <Card title="Lava Damage" icon="fire">
+    Damage from swimming in lava
+  </Card>
+</CardGroup>
+
+## Inventory & Crafting
+
+<CardGroup cols={2}>
+  <Card title="Inventory Management" icon="box">
+    Full inventory system with hotbar
+  </Card>
+  <Card title="Crafting" icon="hammer">
+    Working crafting system with recipes
+  </Card>
+  <Card title="Workbenches" icon="table">
+    3x3 crafting grid for complex recipes
+  </Card>
+  <Card title="Item Actions" icon="hand">
+    Place blocks, use tools, eat food
+  </Card>
+</CardGroup>
+
+## Blocks & Containers
+
+<CardGroup cols={2}>
+  <Card title="Chests" icon="box-open">
+    Wooden chests with 27 item slots
+  </Card>
+  <Card title="Iron Chests" icon="vault">
+    Double capacity iron chests with 54 slots
+  </Card>
+  <Card title="Furnaces" icon="fire-burner">
+    Fuel-based instant smelting
+  </Card>
+  <Card title="Signs" icon="sign-hanging">
+    Placeable and editable signs (up to 256 per world)
+  </Card>
+</CardGroup>
+
+## Interactive Blocks
+
+<CardGroup cols={2}>
+  <Card title="Doors" icon="door-open">
+    Wooden and iron doors (manually operated)
+  </Card>
+  <Card title="Trapdoors" icon="rectangle-vertical">
+    Openable trapdoors
+  </Card>
+  <Card title="Farmland" icon="seedling">
+    Tillable farmland with hoe
+  </Card>
+  <Card title="Crops" icon="wheat-awn">
+    Growable wheat from seeds
+  </Card>
+</CardGroup>
+
+## Video Settings
+
+Compile-time settings in `source/graphics/gfx_settings.h`:
+
+- **GFX_CLOUDS** - Enable/disable 3D cloud rendering
+- **GFX_FANCY_LIQUIDS** - Transparent animated liquids vs opaque static
+- **GFX_GUI_SCALE** - Interface scaling (1 for 320x240, 2 for 640x480)
+- **GFX_PC_WINDOW_WIDTH/HEIGHT** - PC window resolution
+
+## Save Compatibility
+
+fCavEX uses custom save formats for some features:
+
+<Warning>
+  Chest contents and sign text use incompatible binary formats (`chests.dat`, `signs.dat`). Already placed chests and signs from vanilla saves need to be broken and replaced.
+</Warning>
+
+<Info>
+  World generation is not yet implemented. Use freshly created Beta 1.7.3 worlds for best compatibility.
+</Info>
+
+## Limitations
+
+- No redstone or automation (blocks present but non-functional)
+- No block update logic (planned)
+- No 2D mobs or combat (planned)
+- Maximum 256 chests/iron chests per world
+- Maximum 256 signs per world
+- Tools are unbreakable (durability system simplified)
+- Double chests not supported
+- Iron doors must be opened manually (no redstone)

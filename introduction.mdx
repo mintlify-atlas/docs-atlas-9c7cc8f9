@@ -1,0 +1,154 @@
+---
+title: Introduction to fCavEX
+description: A Wii homebrew game recreating Minecraft Beta 1.7.3 with experimental features and enhancements
+---
+
+# Welcome to fCavEX
+
+fCavEX is an experimental fork of [CavEX](https://github.com/xtreme8000/CavEX) by xtreme8000, bringing Minecraft Beta 1.7.3 survival gameplay to the Nintendo Wii. Unlike its parent project, fCavEX embraces experimental features and doesn't aim for a 1:1 recreation - it includes additions not from the original game and modified mechanics for enhanced gameplay.
+
+<Note>
+fCavEX is currently tested primarily on PC. While Wii support exists, you may encounter platform-specific bugs.
+</Note>
+
+<Warning>
+fCavEX does not maintain complete save compatibility with CavEX. Chests and signs use an incompatible saving system with static limits, and some blocks may use metadata values differently. Freshly created saves should be compatible since fCavEX doesn't have its own world generator yet.
+</Warning>
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Optimized Performance" icon="gauge-high">
+    Great performance on Wii hardware with approximately 60fps gameplay and 5 chunk render distance
+  </Card>
+  
+  <Card title="Beta World Support" icon="cube">
+    Load newly created Minecraft Beta world saves with correct light propagation and ambient occlusion
+  </Card>
+  
+  <Card title="Extensive Block Library" icon="cubes">
+    Nearly all blocks from Beta 1.7.3 implemented, except redstone-related components
+  </Card>
+  
+  <Card title="Survival Mechanics" icon="heart">
+    Health system with 160 HP (10 hearts), damage types including fall damage, lava, and drowning
+  </Card>
+</CardGroup>
+
+## What's Included
+
+### Gameplay Features
+
+- **Health System**: Up to 160 health points (one heart = 16 HP)
+- **Damage Types**: Fall damage, lava damage, drowning, and food poisoning
+- **Food System**: Eat to restore health - apples, golden apples, bread, mushroom stew, cooked porkchops, and cooked fish
+- **Death & Respawning**: Drop all items on death and respawn at world spawn with half max health
+- **Oxygen Bar**: Displayed when underwater; start drowning when depleted
+
+### Blocks & Items
+
+- Working doors (wooden and iron), trapdoors, and signs
+- Chests with item storage (up to 256 per world)
+- Iron chests with double capacity
+- Furnaces requiring fuel (up to 15 fuel units)
+- Many items from the original game
+
+### Visual Features
+
+- Correct light propagation
+- Ambient occlusion on blocks
+- Optional 3D clouds (compile-time setting)
+- Configurable liquid rendering (fancy transparent or fast opaque)
+- Compile-time video settings for performance tuning
+
+## What's Different from CavEX
+
+fCavEX 0.3.0_f1 introduces several changes from CavEX 0.3.0:
+
+### Major Additions
+
+- **Enhanced Health System**: 160 HP total instead of 20 HP
+- **Iron Chests**: Crafted like wooden chests but with iron ingots, offering double capacity
+- **Functional Signs**: Craftable and editable signs (up to 256 per world)
+- **Video Settings**: Compile-time configuration in `source/graphics/gfx_settings.h`
+- **Liquid Rendering Options**: Choose between fancy (transparent, animated) or fast (opaque) liquids
+
+### Key Changes
+
+- **Optimized Leaf Rendering**: Uses fewer vertices/quads for better performance
+- **2D Item Entities**: Billboarded sprites instead of 3D models
+- **Chest Storage System**: Binary `chests.dat` format (incompatible with CavEX)
+- **Sign Text Storage**: Binary `signs.dat` format (incompatible with CavEX)
+- **Furnace Mechanics**: Require fuel via right-click; instant smelting drains 1 fuel per item
+- **Food Rebalancing**: Can only eat at less than full health; raw meat damages you
+- **Resource Crafting**: 9 ingots/diamonds craft 1 block instead of 4
+
+<Note>
+For a complete list of changes, see [CHANGES.md](https://github.com/xtreme8000/CavEX/blob/main/CHANGES.md) in the source repository.
+</Note>
+
+## Platform Support
+
+<CardGroup cols={2}>
+  <Card title="Nintendo Wii" icon="gamepad">
+    Optimized for Wii homebrew with ~60fps performance. Supports Wiimote, Nunchuk, Classic Controller, and even Guitar Hero 3 controllers.
+  </Card>
+  
+  <Card title="GNU/Linux PC" icon="desktop">
+    Run on any PC with OpenGL 2.0 support. Play with keyboard and mouse for testing or development.
+  </Card>
+</CardGroup>
+
+## Get Started
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get fCavEX up and running on your Wii or PC
+  </Card>
+  
+  <Card title="Build Instructions" icon="hammer" href="/building/dependencies">
+    Compile from source for Wii or PC platforms
+  </Card>
+  
+  <Card title="Controls" icon="keyboard" href="/gameplay/controls">
+    Learn the control schemes for different input devices
+  </Card>
+  
+  <Card title="Video Settings" icon="sliders" href="/building/video-settings">
+    Configure graphics settings for optimal performance
+  </Card>
+</CardGroup>
+
+## Video Settings Overview
+
+fCavEX includes compile-time video settings configured in `source/graphics/gfx_settings.h`:
+
+```c
+// Render clouds
+#define GFX_CLOUDS
+
+// Render double-sided faces (tall grass, sugar cane)
+#define GFX_DOUBLESIDED
+
+// Transparent and animated liquids
+#define GFX_FANCY_LIQUIDS
+
+// Scale HUD and GUIs (2 for 640x480, 1 for 320x240)
+#define GFX_GUI_SCALE 2
+
+// PC only: default window dimensions
+#define GFX_PC_WINDOW_WIDTH 640
+#define GFX_PC_WINDOW_HEIGHT 400
+```
+
+<Warning>
+After changing video settings, you must recompile the game for changes to take effect.
+</Warning>
+
+## Community
+
+fCavEX is based on [CavEX](https://github.com/xtreme8000/CavEX) by [xtreme8000](https://github.com/xtreme8000). This fork explores experimental features while maintaining the core survival experience of Minecraft Beta 1.7.3.
+
+## License
+
+fCavEX is licensed under the GNU General Public License v3.0. See the LICENSE file in the source repository for details.

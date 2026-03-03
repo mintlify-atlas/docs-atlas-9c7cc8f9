@@ -1,0 +1,151 @@
+---
+title: Configuration File
+description: Understanding the config.json structure and available options for fCavEX
+---
+
+fCavEX uses a `config.json` file to store game settings, including file paths and input mappings. The configuration file is located in the root directory of the game.
+
+## Configuration Structure
+
+The configuration file consists of two main sections:
+
+### Paths Section
+
+Defines the directory paths for game assets and save data.
+
+```json
+{
+  "paths": {
+    "texturepack": "assets",
+    "worlds": "saves"
+  }
+}
+```
+
+| Option | Type | Description | Default |
+|--------|------|-------------|--------|
+| `texturepack` | string | Path to the texture pack assets directory | `"assets"` |
+| `worlds` | string | Path to the world save files directory | `"saves"` |
+
+### Input Section
+
+Defines key and button mappings for all game controls. Each action can have multiple input IDs assigned to it.
+
+```json
+{
+  "input": {
+    "player_forward": [87],
+    "player_backward": [83],
+    "player_left": [65],
+    "player_right": [68],
+    "player_jump": [32],
+    "player_sneak": [340],
+    "item_action_left": [1000],
+    "item_action_right": [1001],
+    "scroll_left": [49],
+    "scroll_right": [50],
+    "inventory": [69],
+    "open_menu": [257],
+    "gui_up": [265],
+    "gui_down": [264],
+    "gui_left": [263],
+    "gui_right": [262],
+    "gui_click": [1000],
+    "gui_click_alt": [1001],
+    "screenshot": [291]
+  }
+}
+```
+
+## Available Actions
+
+### Player Movement
+
+| Action | Description | Default (PC) | Default (Wii) |
+|--------|-------------|--------------|---------------|
+| `player_forward` | Move forward | `[87]` (W) | `[0, 200, 910]` (Wiimote/Classic D-Pad Up, Classic L-Stick Up) |
+| `player_backward` | Move backward | `[83]` (S) | `[1, 201, 911]` (Wiimote/Classic D-Pad Down, Classic L-Stick Down) |
+| `player_left` | Strafe left | `[65]` (A) | `[2, 202, 912]` (Wiimote/Classic D-Pad Left, Classic L-Stick Left) |
+| `player_right` | Strafe right | `[68]` (D) | `[3, 203, 913]` (Wiimote/Classic D-Pad Right, Classic L-Stick Right) |
+| `player_jump` | Jump | `[32]` (Space) | `[5, 210]` (Wiimote B, Classic L Full) |
+| `player_sneak` | Sneak/Crouch | `[340]` (Left Shift) | `[211]` (Classic R Full) |
+
+### Item Actions
+
+| Action | Description | Default (PC) | Default (Wii) |
+|--------|-------------|--------------|---------------|
+| `item_action_left` | Attack/Break block | `[1000]` (Left Mouse) | `[100, 204]` (Nunchuk Z, Classic A) |
+| `item_action_right` | Use item/Place block | `[1001]` (Right Mouse) | `[101, 205]` (Nunchuk C, Classic B) |
+| `scroll_left` | Scroll hotbar left | `[49]` (1) | `[9, 208, 213]` (Wiimote Minus, Classic ZL, Classic Minus) |
+| `scroll_right` | Scroll hotbar right | `[50]` (2) | `[8, 209, 212]` (Wiimote Plus, Classic ZR, Classic Plus) |
+
+### Menu Actions
+
+| Action | Description | Default (PC) | Default (Wii) |
+|--------|-------------|--------------|---------------|
+| `inventory` | Open inventory | `[69]` (E) | `[6, 206]` (Wiimote 1, Classic X) |
+| `open_menu` | Open pause menu | `[257]` (Enter/Esc) | `[10, 214]` (Wiimote/Classic Home) |
+| `screenshot` | Take screenshot | `[291]` (F2) | `[7]` (Wiimote 2) |
+
+### GUI Navigation
+
+| Action | Description | Default (PC) | Default (Wii) |
+|--------|-------------|--------------|---------------|
+| `gui_up` | Navigate up in menus | `[265]` (Up Arrow) | `[0, 200, 900, 910, 920]` (D-Pad/Joysticks Up) |
+| `gui_down` | Navigate down in menus | `[264]` (Down Arrow) | `[1, 201, 901, 911, 921]` (D-Pad/Joysticks Down) |
+| `gui_left` | Navigate left in menus | `[263]` (Left Arrow) | `[2, 202, 902, 912, 922]` (D-Pad/Joysticks Left) |
+| `gui_right` | Navigate right in menus | `[262]` (Right Arrow) | `[3, 203, 903, 913, 923]` (D-Pad/Joysticks Right) |
+| `gui_click` | Confirm/Select | `[1000]` (Left Mouse) | `[4, 204]` (Wiimote A, Classic A) |
+| `gui_click_alt` | Alternative click | `[1001]` (Right Mouse) | `[5, 205]` (Wiimote B, Classic B) |
+
+## Platform-Specific Configurations
+
+fCavEX includes three configuration files:
+
+- `config.json` - Default configuration (PC controls)
+- `config_pc.json` - PC-specific configuration with keyboard/mouse
+- `config_wii.json` - Wii-specific configuration with Wiimote/Classic Controller support
+
+## Input ID Format
+
+Input IDs are numeric values that map to specific keys or buttons:
+
+- **PC Keyboard**: Key codes (e.g., 87 for W, 65 for A)
+- **PC Mouse**: 1000 for left click, 1001 for right click
+- **Wii Controllers**: See [Input Mapping](/configuration/input-mapping) for complete reference
+
+## Example: Custom Configuration
+
+Here's an example of a custom configuration with modified controls:
+
+```json
+{
+  "paths": {
+    "texturepack": "assets",
+    "worlds": "saves"
+  },
+  "input": {
+    "player_forward": [87, 265],
+    "player_backward": [83, 264],
+    "player_left": [65],
+    "player_right": [68],
+    "player_jump": [32],
+    "player_sneak": [340, 341],
+    "item_action_left": [1000],
+    "item_action_right": [1001],
+    "scroll_left": [49, 263],
+    "scroll_right": [50, 262],
+    "inventory": [69, 9],
+    "open_menu": [257],
+    "gui_up": [265, 87],
+    "gui_down": [264, 83],
+    "gui_left": [263, 65],
+    "gui_right": [262, 68],
+    "gui_click": [1000, 257],
+    "gui_click_alt": [1001],
+    "screenshot": [291]
+  }
+}
+```
+
+This configuration adds arrow keys as alternative movement controls and Tab (9) as an alternative inventory key.

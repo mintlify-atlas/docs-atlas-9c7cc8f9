@@ -1,0 +1,163 @@
+---
+title: Building for Wii
+description: Build fCavEX for the Nintendo Wii platform
+---
+
+## Prerequisites
+
+Before building for Wii, ensure you have:
+
+1. Completed the [dependency setup](/building/dependencies)
+2. Installed the devkitPro toolchain
+3. Installed required Wii libraries
+
+## Install devkitPro
+
+<Steps>
+  <Step title="Download devkitPro">
+    Follow the official installation guide at [https://devkitpro.org/wiki/Getting_Started](https://devkitpro.org/wiki/Getting_Started) for your operating system.
+  </Step>
+  
+  <Step title="Install Wii development packages">
+    Use the devkitPro package manager to install the required libraries:
+    
+    ```bash
+    dkp-pacman -S wii-dev ppc-zlib
+    ```
+  </Step>
+  
+  <Step title="Set environment variables">
+    Ensure `DEVKITPPC` is set in your environment. This is typically done automatically by the devkitPro installer.
+    
+    If using a shell other than bash (e.g., fish), you may need to manually load the environment:
+    
+    ```bash
+    source /etc/profile.d/devkit-env.sh
+    ```
+  </Step>
+</Steps>
+
+## Build Process
+
+<Steps>
+  <Step title="Navigate to source directory">
+    ```bash
+    cd /path/to/fcavex/source
+    ```
+  </Step>
+  
+  <Step title="Run make">
+    Build the project using the Makefile:
+    
+    ```bash
+    make
+    ```
+    
+    This will compile fCavEX and produce a `.dol` file in the root directory.
+  </Step>
+</Steps>
+
+## Build Configuration
+
+The Wii build uses the following compiler flags (from `Makefile:35`):
+
+```makefile
+CFLAGS = -std=c99 -pedantic -Wextra -Wno-unused-parameter \
+         -flto=auto -O3 -Wall -DNDEBUG -DPLATFORM_WII
+```
+
+### Compiler Options
+
+- **`-std=c99`** - Use C99 standard
+- **`-O3`** - Maximum optimization level
+- **`-flto=auto`** - Link-time optimization for better performance
+- **`-DPLATFORM_WII`** - Platform-specific compilation flag
+- **`-DNDEBUG`** - Disable debug assertions
+
+### Linked Libraries
+
+The following libraries are linked (from `Makefile:43`):
+
+```makefile
+LIBS := -lwiiuse -lfat -lbte -logc -lm -lz
+```
+
+- **libwiiuse** - Wii remote input handling
+- **libfat** - FAT filesystem support (SD card access)
+- **libbte** - Block transfer engine
+- **libogc** - OGC/libogc core library
+- **libm** - Math library
+- **libz** - zlib compression
+
+## Deployment
+
+<Steps>
+  <Step title="Prepare directory structure">
+    Create the following structure on your SD card:
+    
+    ```
+    apps/cavex/
+    ├── assets/
+    │   ├── terrain.png
+    │   ├── items.png
+    │   ├── anim.png
+    │   ├── default.png
+    │   ├── gui.png
+    │   └── gui2.png
+    ├── saves/
+    │   └── world/
+    ├── boot.dol
+    ├── config.json
+    ├── icon.png
+    └── meta.xml
+    ```
+  </Step>
+  
+  <Step title="Copy the DOL file">
+    Copy the compiled `.dol` file from the build directory to `apps/cavex/boot.dol` on your SD card.
+  </Step>
+  
+  <Step title="Copy assets">
+    Ensure all required texture files are in the `assets/` directory.
+  </Step>
+  
+  <Step title="Launch on Wii">
+    Use the Homebrew Channel on your Wii to launch fCavEX.
+  </Step>
+</Steps>
+
+## Optional: Direct Loading
+
+If you have wiiload set up on your network, you can load the game directly to your Wii:
+
+```bash
+make run
+```
+
+This executes `wiiload $(OUTPUT).dol` (from `Makefile:120`).
+
+## Performance Considerations
+
+<Note>
+fCavEX is optimized for Wii hardware and typically runs at around 60fps with a 5-chunk render distance. Adjust [video settings](/building/video-settings) before building to optimize performance for your needs.
+</Note>
+
+### Recommended Settings for Wii
+
+For optimal performance on Wii hardware:
+
+- Keep `GFX_GUI_SCALE` at `2` for 640x480 resolution
+- Consider disabling `GFX_FANCY_LIQUIDS` if experiencing frame drops
+- `GFX_CLOUDS` can be disabled for a small performance boost
+
+See the [Video Settings](/building/video-settings) page for more details.
+
+## Cleaning Build Files
+
+To clean the build directory:
+
+```bash
+make clean
+```
+
+This removes all build artifacts and the generated `.dol` and `.elf` files.

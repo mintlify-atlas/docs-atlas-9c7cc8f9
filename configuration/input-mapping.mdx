@@ -1,0 +1,153 @@
+---
+title: Input Mapping Reference
+description: Complete reference of input mapping IDs for Wii controllers in fCavEX
+---
+
+This page provides a complete reference of input mapping IDs used in the `config.json` file for Wii controllers. Each button and joystick direction has a unique numeric ID that can be assigned to game actions.
+
+## How to Use Input IDs
+
+In your `config.json` file, each action accepts an array of input IDs. You can assign multiple inputs to the same action:
+
+```json
+{
+  "input": {
+    "player_jump": [5, 210]
+  }
+}
+```
+
+This example maps the jump action to both Wiimote B button (ID `5`) and Classic Controller L button (ID `210`).
+
+## Wiimote
+
+Standard Wiimote buttons and directional pad.
+
+| Button | Config ID |
+|--------|:---------:|
+| D-Pad Up | `0` |
+| D-Pad Down | `1` |
+| D-Pad Left | `2` |
+| D-Pad Right | `3` |
+| A | `4` |
+| B | `5` |
+| 1 | `6` |
+| 2 | `7` |
+| Plus (+) | `8` |
+| Minus (-) | `9` |
+| Home | `10` |
+
+## Nunchuk
+
+Nunchuk attachment buttons and analog stick directions.
+
+| Button/Direction | Config ID |
+|------------------|:---------:|
+| Z | `100` |
+| C | `101` |
+| Joystick Up | `900` |
+| Joystick Down | `901` |
+| Joystick Left | `902` |
+| Joystick Right | `903` |
+
+## Classic Controller
+
+Classic Controller buttons, triggers, and dual analog sticks.
+
+| Button/Direction | Config ID |
+|------------------|:---------:|
+| D-Pad Up | `200` |
+| D-Pad Down | `201` |
+| D-Pad Left | `202` |
+| D-Pad Right | `203` |
+| A | `204` |
+| B | `205` |
+| X | `206` |
+| Y | `207` |
+| ZL (Left Trigger) | `208` |
+| ZR (Right Trigger) | `209` |
+| L (Full Press) | `210` |
+| R (Full Press) | `211` |
+| Plus (+) | `212` |
+| Minus (-) | `213` |
+| Home | `214` |
+| L Joystick Up | `910` |
+| L Joystick Down | `911` |
+| L Joystick Left | `912` |
+| L Joystick Right | `913` |
+| R Joystick Up | `920` |
+| R Joystick Down | `921` |
+| R Joystick Left | `922` |
+| R Joystick Right | `923` |
+
+## Guitar Hero 3 Controller
+
+Guitar Hero 3 guitar controller support.
+
+| Button | Config ID |
+|--------|:---------:|
+| Yellow | `300` |
+| Green | `301` |
+| Blue | `302` |
+| Red | `303` |
+| Orange | `304` |
+| Plus (+) | `305` |
+| Minus (-) | `306` |
+| Strum Up | `307` |
+| Strum Down | `308` |
+
+## PC Input IDs
+
+For PC controls, the following special IDs are used:
+
+| Input | Config ID |
+|-------|:---------:|
+| Left Mouse Button | `1000` |
+| Right Mouse Button | `1001` |
+| Keyboard Keys | ASCII/GLFW key codes |
+
+Common keyboard key codes:
+- W: `87`
+- A: `65`
+- S: `83`
+- D: `68`
+- Space: `32`
+- E: `69`
+- Enter/Escape: `257`
+- Left Shift: `340`
+- Arrow Up: `265`
+- Arrow Down: `264`
+- Arrow Left: `263`
+- Arrow Right: `262`
+- F2: `291`
+- 1: `49`
+- 2: `50`
+
+## Example Configuration
+
+Here's an example showing how to configure controls for Wii with Classic Controller:
+
+```json
+{
+  "input": {
+    "player_forward": [0, 200, 910],
+    "player_backward": [1, 201, 911],
+    "player_left": [2, 202, 912],
+    "player_right": [3, 203, 913],
+    "player_jump": [5, 210],
+    "player_sneak": [211],
+    "item_action_left": [100, 204],
+    "item_action_right": [101, 205],
+    "scroll_left": [9, 208, 213],
+    "scroll_right": [8, 209, 212],
+    "inventory": [6, 206],
+    "open_menu": [10, 214],
+    "screenshot": [7]
+  }
+}
+```
+
+This configuration allows movement using:
+- Wiimote D-Pad (IDs 0-3)
+- Classic Controller D-Pad (IDs 200-203)
+- Classic Controller left analog stick (IDs 910-913)

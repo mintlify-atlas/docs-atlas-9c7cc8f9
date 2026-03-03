@@ -1,0 +1,197 @@
+---
+title: Codebase Architecture
+description: Overall architecture and structure of the fCavEX codebase
+---
+
+fCavEX is a Wii homebrew game that recreates Minecraft Beta 1.7.3. The codebase is written in C with platform-specific abstractions for Wii and PC.
+
+## Project Structure
+
+The source code is organized into distinct modules:
+
+```
+source/
+├── main.c                    # Main game loop and initialization
+├── world.h/c                 # World management
+├── chunk.h/c                 # Chunk storage and lifecycle
+├── chunk_mesher.h/c          # Multithreaded chunk mesh generation
+├── block/                    # Block system
+│   ├── blocks.h              # Block interface
+│   ├── blocks_data.h         # Block types and data structures
+│   └── block_*.c             # Individual block implementations
+├── entity/                   # Entity system
+│   ├── entity.h              # Entity interface and types
+│   └── monsters_object.h     # Monster definitions
+├── graphics/                 # Rendering subsystem
+│   ├── render_block.h        # Block rendering functions
+│   ├── render_item.h         # Item rendering
+│   ├── gfx_util.h            # Graphics utilities
+│   └── texture_atlas.h       # Texture management
+├── platform/                 # Platform abstraction layer
+│   ├── gfx.h                 # Graphics API
+│   ├── input.h               # Input handling
+│   ├── thread.h              # Threading
+│   └── texture.h             # Texture loading
+├── item/                     # Item and inventory system
+├── network/                  # Local server and world I/O
+└── game/                     # Game state and screens
+```
+
+## Main Game Loop
+
+The game follows a classic render loop pattern defined in `source/main.c:52-283`:
+
+```c
+int main(void) {
+    // Initialization
+    input_init();
+    blocks_init();
+    items_init();
+    render_monster_init();
+    recipe_init();
+    gfx_setup();
+    world_create(&gstate.world);
+    chunk_mesher_init();
+    particle_init();
+    
+    while(!gstate.quit) {
+        // Update timing
+        gstate.stats.dt = time_diff_s(last_frame, this_frame);
+        gstate.stats.fps = 1.0F / gstate.stats.dt;
+        
+        // Fixed timestep game ticks (50ms)
+        while(tick_delta >= 1.0F) {
+            particle_update();
+            entities_client_tick(gstate.entities);
+            tick_delta -= 1.0F;
+        }
+        
+        // Camera and world updates
+        camera_attach(&gstate.camera, gstate.local_player, tick_delta, dt);
+        world_pre_render(&gstate.world, &gstate.camera, view);
+        world_update_lighting(&gstate.world);
+        world_build_chunks(&gstate.world, CHUNK_MESHER_QLENGTH);
+        
+        // Rendering
+        gfx_clear_buffers(atmosphere_color);
+        world_render(&gstate.world, &gstate.camera, false);
+        entities_client_render(gstate.entities, &gstate.camera, tick_delta);
+        
+        // GUI and input
+        input_poll();
+        gfx_finish(true);
+    }
+}
+```
+
+## Game State
+
+The global game state is defined in `source/game/game_state.h:41-84`:
+
+```c
+struct game_state {
+    sig_atomic_t quit;
+    struct random_gen rand_src;
+    struct config config_user;
+    
+    struct {
+        float dt, fps;
+        float dt_gpu, dt_vsync;
+        size_t chunks_rendered;
+    } stats;
+    
+    struct {
+        float fov;
+        float render_distance;
+        float fog_distance;
+    } config;
+    
+    struct screen* current_screen;
+    struct camera camera;
+    struct camera_ray_result camera_hit;
+    struct world world;
+    struct entity* local_player;
+    dict_entity_t entities;
+    uint64_t world_time;
+    ptime_t world_time_start;
+    struct window_container* windows[256];
+    bool world_loaded;
+    bool in_water;
+    bool paused;
+    int oxygen;
+};
+
+extern struct game_state gstate;
+```
+
+## Platform Abstraction
+
+The platform layer (`source/platform/`) provides a consistent API across Wii and PC:
+
+- **Graphics**: `gfx.h` provides rendering primitives, matrix operations, blending modes, and fog control
+- **Input**: `input.h` handles controller/keyboard input mapping
+- **Threading**: `thread.h` provides thread creation and channels for chunk mesher communication
+- **Timing**: `time.h` offers platform-independent time measurement
+- **Textures**: `texture.h` handles texture loading and management
+- **Display Lists**: `displaylist.h` manages GPU command buffers for efficient rendering
+
+## Threading Architecture
+
+fCavEX uses a single background thread for chunk meshing to avoid blocking the main render loop:
+
+```c
+// Main thread
+world_build_chunks(&gstate.world, CHUNK_MESHER_QLENGTH);  // Send requests
+chunk_mesher_receive();  // Receive completed meshes
+
+// Mesher thread (source/chunk_mesher.c:502-511)
+static void* chunk_mesher_local_thread(void* user) {
+    while(1) {
+        struct chunk_mesher_rpc* request;
+        tchannel_receive(&mesher_requests, (void**)&request, true);
+        chunk_mesher_build(request);
+        tchannel_send(&mesher_results, request, true);
+    }
+}
+```
+
+## Memory Management
+
+The codebase uses reference counting for chunks:
+
+```c
+void chunk_ref(struct chunk* c);    // Increment reference count
+void chunk_unref(struct chunk* c);  // Decrement, free when zero
+```
+
+World sections use M-lib dictionaries for efficient spatial lookups:
+
+```c
+DICT_DEF2(dict_wsection, int64_t, M_BASIC_OPLIST, 
+          struct world_section, M_POD_OPLIST)
+
+#define SECTION_TO_ID(x, z) \
+    (((int64_t)(z) << 32) | (((int64_t)(x) & 0xFFFFFFFF)))
+```
+
+## Data Flow
+
+1. **World Loading**: Network layer reads region files → World creates chunks → Chunks added to world sections
+2. **Block Modification**: User input → Server logic → `world_set_block()` → Lighting update queued → Chunk marked for rebuild
+3. **Rendering**: Camera frustum culling → BFS visibility test → Chunk mesher builds geometry → GPU renders display lists
+4. **Entity Updates**: Fixed 50ms tick → Physics integration → Collision detection → Rendering with interpolation
+
+## Key Dependencies
+
+- **cglm**: OpenGL mathematics library for vectors and matrices
+- **M-lib**: Generic container library (dictionaries, lists)
+- **cNBT**: NBT format parsing for world data
+- **lodepng**: PNG encoding for screenshots
+
+## Build System
+
+The project uses CMake with platform-specific configurations:
+
+- Wii builds use DevkitPPC toolchain
+- PC builds support both OpenGL and software rendering
+- Makefile wrapper provides convenience commands

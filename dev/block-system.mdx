@@ -1,0 +1,404 @@
+---
+title: Block System
+description: Block implementation details and architecture
+---
+
+The block system defines the properties and behaviors of all block types in fCavEX. Each block is implemented as a struct with function pointers for customizable behavior.
+
+## Block Structure
+
+From `source/block/blocks.h:35-70`:
+
+```c
+struct block {
+    char name[32];
+    
+    // Function pointers for behavior
+    enum block_material (*getMaterial)(struct block_info*);
+    uint8_t (*getTextureIndex)(struct block_info*, enum side);
+    struct face_occlusion* (*getSideMask)(struct block_info*, enum side,
+                                          struct block_info*);
+    size_t (*getBoundingBox)(struct block_info*, bool, struct AABB*);
+    size_t (*renderBlock)(struct displaylist*, struct block_info*, enum side,
+                          struct block_info*, uint8_t*, bool);
+    size_t (*renderBlockAlways)(struct displaylist*, struct block_info*,
+                                enum side, struct block_info*, uint8_t*, bool);
+    size_t (*getDroppedItem)(struct block_info*, struct item_data*,
+                             struct random_gen*, struct server_local*);
+    void (*onRandomTick)(struct server_local*, struct block_info*);
+    void (*onRightClick)(struct server_local*, struct item_data*,
+                         struct block_info*, struct block_info*, enum side);
+    
+    // Properties
+    bool transparent;           // Can see through (glass, leaves)
+    uint8_t luminance : 4;     // Light emission (0-15)
+    uint8_t opacity : 4;       // Light blocking (0-15)
+    bool double_sided;         // Render both faces
+    bool can_see_through;      // For chunk occlusion culling
+    bool ignore_lighting;      // Render at full brightness
+    bool flammable;            // Can catch fire
+    bool place_ignore;         // Can place blocks through it
+    
+    // Digging properties
+    struct block_dig_data {
+        int hardness;              // Time to break in ms
+        enum tool_type tool;       // Required tool type
+        enum tool_tier min;        // Minimum tool tier
+        enum tool_tier best;       // Best tool tier
+    } digging;
+    
+    // Render-specific data
+    union block_render_data {
+        bool cross_random_displacement;  // Random offset for plants
+        bool rail_curved_possible;       // Rails can curve
+    } render_block_data;
+    
+    // Associated item
+    struct item block_item;
+};
+```
+
+## Block Data Storage
+
+Blocks are stored with metadata and lighting in a compact format:
+
+```c
+struct block_data {
+    uint8_t type;              // Block type ID (0-255)
+    uint8_t metadata : 4;      // Block-specific data (0-15)
+    uint8_t sky_light : 4;     // Sky light level (0-15)
+    uint8_t torch_light : 4;   // Torch light level (0-15)
+};
+
+struct block_info {
+    struct block_data* block;       // This block's data
+    struct block_data* neighbours;  // Array of 6 neighbor blocks
+    w_coord_t x, y, z;             // World position
+};
+```
+
+## Block Types
+
+Defined in `source/block/blocks_data.h:44-120`:
+
+```c
+enum block_type {
+    BLOCK_AIR = 0,
+    BLOCK_STONE = 1,
+    BLOCK_GRASS = 2,
+    BLOCK_DIRT = 3,
+    BLOCK_COBBLESTONE = 4,
+    BLOCK_PLANKS = 5,
+    BLOCK_SAPLING = 6,
+    BLOCK_BEDROCK = 7,
+    BLOCK_WATER_FLOW = 8,
+    BLOCK_WATER_STILL = 9,
+    // ... 120+ block types
+};
+```
+
+## Block Registry
+
+Blocks are registered in a global array:
+
+```c
+extern struct block* blocks[256];
+
+void blocks_init(void) {
+    blocks[BLOCK_STONE] = &block_stone;
+    blocks[BLOCK_GRASS] = &block_grass;
+    blocks[BLOCK_DIRT] = &block_dirt;
+    // ... initialize all blocks
+}
+```
+
+## Example Block Implementation
+
+Stone block from `source/block/block_stone.c:1-86`:
+
+```c
+static enum block_material getMaterial(struct block_info* this) {
+    return MATERIAL_STONE;
+}
+
+static size_t getBoundingBox(struct block_info* this, bool entity,
+                             struct AABB* x) {
+    if(x)
+        aabb_setsize(x, 1.0F, 1.0F, 1.0F);
+    return 1;
+}
+
+static struct face_occlusion*
+getSideMask(struct block_info* this, enum side side, struct block_info* it) {
+    return face_occlusion_full();  // Blocks all faces
+}
+
+static uint8_t getTextureIndex(struct block_info* this, enum side side) {
+    return tex_atlas_lookup(TEXAT_STONE);
+}
+
+static size_t getDroppedItem(struct block_info* this, struct item_data* it,
+                             struct random_gen* g, struct server_local* s) {
+    if(it) {
+        it->id = BLOCK_COBBLESTONE;  // Drops cobblestone, not stone
+        it->durability = 0;
+        it->count = 1;
+    }
+    return 1;
+}
+
+struct block block_stone = {
+    .name = "Stone",
+    .getSideMask = getSideMask,
+    .getBoundingBox = getBoundingBox,
+    .getMaterial = getMaterial,
+    .getTextureIndex = getTextureIndex,
+    .getDroppedItem = getDroppedItem,
+    .onRandomTick = NULL,
+    .onRightClick = NULL,
+    .transparent = false,
+    .renderBlock = render_block_full,
+    .renderBlockAlways = NULL,
+    .luminance = 0,
+    .opacity = 15,
+    .double_sided = false,
+    .can_see_through = false,
+    .ignore_lighting = false,
+    .flammable = false,
+    .place_ignore = false,
+    .digging = {
+        .hardness = 2250,              // 2.25 seconds base
+        .tool = TOOL_TYPE_PICKAXE,     // Requires pickaxe
+        .min = TOOL_TIER_WOOD,         // Wooden pickaxe minimum
+        .best = TOOL_TIER_MAX,
+    },
+    .block_item = {
+        .has_damage = false,
+        .max_stack = 64,
+        .renderItem = render_item_block,
+        .onItemPlace = block_place_default,
+        .fuel = 0,
+        .render_data.block.has_default = false,
+        .armor.is_armor = false,
+        .tool.type = TOOL_TYPE_ANY,
+    },
+};
+```
+
+## Block Materials
+
+Materials determine breaking sounds and tool effectiveness:
+
+```c
+enum block_material {
+    MATERIAL_WOOD,
+    MATERIAL_STONE,
+    MATERIAL_WOOL,
+    MATERIAL_ORGANIC,
+    MATERIAL_SAND,
+    MATERIAL_GLASS,
+};
+```
+
+## Rendering Functions
+
+Common render functions from `source/graphics/render_block.h`:
+
+```c
+// Full cube (most blocks)
+size_t render_block_full(struct displaylist* d, struct block_info* this,
+                         enum side side, struct block_info* it,
+                         uint8_t* vertex_light, bool count_only);
+
+// Cross pattern (flowers, saplings)
+size_t render_block_cross(struct displaylist* d, struct block_info* this,
+                          enum side side, struct block_info* it,
+                          uint8_t* vertex_light, bool count_only);
+
+// Fluid with flowing animation
+size_t render_block_fluid(struct displaylist* d, struct block_info* this,
+                          enum side side, struct block_info* it,
+                          uint8_t* vertex_light, bool count_only);
+
+// Slab (half block height)
+size_t render_block_slab(struct displaylist* d, struct block_info* this,
+                         enum side side, struct block_info* it,
+                         uint8_t* vertex_light, bool count_only);
+
+// Stairs (complex geometry)
+size_t render_block_stairs(struct displaylist* d, struct block_info* this,
+                           enum side side, struct block_info* it,
+                           uint8_t* vertex_light, bool count_only);
+
+// Fence (connects to neighbors)
+size_t render_block_fence(struct displaylist* d, struct block_info* this,
+                          enum side side, struct block_info* it,
+                          uint8_t* vertex_light, bool count_only);
+
+// Torch (offset from wall)
+size_t render_block_torch(struct displaylist* d, struct block_info* this,
+                          enum side side, struct block_info* it,
+                          uint8_t* vertex_light, bool count_only);
+```
+
+## Face Occlusion
+
+Blocks define which parts of their faces are solid:
+
+```c
+struct face_occlusion {
+    uint64_t mask;  // 8x8 grid, 1 bit per cell
+};
+
+struct face_occlusion* face_occlusion_full(void);   // Fully opaque
+struct face_occlusion* face_occlusion_empty(void);  // Fully transparent
+struct face_occlusion* face_occlusion_slab(bool top); // Half slab
+
+bool face_occlusion_test(struct face_occlusion* a, 
+                         struct face_occlusion* b) {
+    // Returns true if 'a' is visible through 'b'
+    return (a->mask & b->mask) != a->mask;
+}
+```
+
+## Block Sides
+
+```c
+enum side {
+    SIDE_TOP = 0,
+    SIDE_BOTTOM = 1,
+    SIDE_LEFT = 2,
+    SIDE_RIGHT = 3,
+    SIDE_FRONT = 4,
+    SIDE_BACK = 5,
+    SIDE_MAX
+};
+
+enum side blocks_side_opposite(enum side s);
+void blocks_side_offset(enum side s, int* x, int* y, int* z);
+```
+
+## Block Events
+
+### Random Tick
+
+Called periodically for blocks that need updates (crops, fire):
+
+```c
+void onRandomTick(struct server_local* s, struct block_info* this) {
+    // Called randomly for active blocks
+    // Used for crop growth, fire spread, etc.
+}
+```
+
+### Right Click
+
+Called when player interacts with block:
+
+```c
+void onRightClick(struct server_local* s, struct item_data* held_item,
+                  struct block_info* this, struct block_info* clicked,
+                  enum side on_side) {
+    // Open GUI, change state, etc.
+}
+```
+
+## Bounding Boxes
+
+Blocks can have multiple collision boxes:
+
+```c
+size_t getBoundingBox(struct block_info* this, bool entity, struct AABB* x) {
+    // entity=true for collision, entity=false for ray picking
+    if(x) {
+        // Fill AABB array
+        aabb_setsize(x, 1.0F, 1.0F, 1.0F);
+    }
+    return 1;  // Return number of boxes
+}
+
+struct AABB {
+    float x1, y1, z1;  // Min corner
+    float x2, y2, z2;  // Max corner
+};
+
+void aabb_setsize(struct AABB* a, float w, float h, float d);
+void aabb_translate(struct AABB* a, float x, float y, float z);
+bool aabb_intersection(struct AABB* a, struct AABB* b);
+bool aabb_intersection_ray(struct AABB* a, struct ray* r, enum side* s);
+```
+
+## Metadata Usage
+
+The 4-bit metadata field is used for:
+
+- **Wool**: Color (0-15)
+- **Slabs**: Type variant
+- **Stairs**: Rotation and orientation
+- **Doors**: Open/closed state and hinge side
+- **Crops**: Growth stage (0-7)
+- **Logs**: Wood type
+- **Liquids**: Flow level and direction
+- **Rails**: Track configuration
+
+## Block Placement
+
+Default placement logic:
+
+```c
+bool block_place_default(struct server_local* s, struct item_data* it,
+                         struct block_info* where, struct block_info* on,
+                         enum side on_side) {
+    // Check if position is valid
+    if(blocks[where->block->type] && 
+       !blocks[where->block->type]->place_ignore)
+        return false;
+    
+    // Place block
+    struct block_data new_block = {
+        .type = it->id,
+        .metadata = 0,
+    };
+    
+    world_set_block(s->world, where->x, where->y, where->z, 
+                    new_block, true);
+    return true;
+}
+```
+
+## Item Drops
+
+```c
+size_t getDroppedItem(struct block_info* this, struct item_data* it,
+                      struct random_gen* g, struct server_local* s) {
+    // Return number of item stacks to drop
+    // Fill 'it' array with dropped items
+    if(it) {
+        it[0].id = this->block->type;  // Usually drops itself
+        it[0].count = 1;
+        it[0].durability = 0;
+    }
+    return 1;
+}
+```
+
+## Tool Types and Tiers
+
+```c
+enum tool_type {
+    TOOL_TYPE_ANY,
+    TOOL_TYPE_PICKAXE,
+    TOOL_TYPE_AXE,
+    TOOL_TYPE_SHOVEL,
+    TOOL_TYPE_SWORD,
+};
+
+enum tool_tier {
+    TOOL_TIER_WOOD,
+    TOOL_TIER_STONE,
+    TOOL_TIER_IRON,
+    TOOL_TIER_DIAMOND,
+    TOOL_TIER_GOLD,
+    TOOL_TIER_MAX,
+};
+```

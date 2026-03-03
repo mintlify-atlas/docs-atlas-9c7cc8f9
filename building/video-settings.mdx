@@ -1,0 +1,361 @@
+---
+title: Video Settings
+description: Compile-time video configuration options for fCavEX
+---
+
+## Overview
+
+fCavEX uses compile-time video settings defined in `source/graphics/gfx_settings.h`. These settings must be configured before building the game and require recompilation to take effect.
+
+<Warning>
+Changes to video settings require a complete rebuild of the project. Make sure to clean your build directory after modifying settings.
+</Warning>
+
+## Configuration File
+
+All video settings are located in:
+
+```
+source/graphics/gfx_settings.h
+```
+
+From `source/graphics/gfx_settings.h:1-57`:
+
+```c
+#ifndef GFX_SETTINGS_H
+#define GFX_SETTINGS_H
+
+/*
+    This file is used to set video settings at compile time.
+    To disable a setting, comment its line out and recompile.
+    To enable a setting, uncomment its line and recompile.
+    Some settings cannot be disabled or enabled, as they are a number 
+    (like resolution or GUI scale).
+*/
+```
+
+## Available Settings
+
+### GFX_CLOUDS
+
+**Type:** Toggle define  
+**Default:** Enabled  
+**Platforms:** Wii, PC
+
+Controls whether 3D clouds are rendered.
+
+```c
+#define GFX_CLOUDS
+```
+
+<Accordion title="Impact">
+- **Enabled:** 3D clouds are rendered in the sky
+- **Disabled:** No clouds are rendered, slight performance improvement
+</Accordion>
+
+**To disable:**
+```c
+//#define GFX_CLOUDS
+```
+
+### GFX_DOUBLESIDED
+
+**Type:** Toggle define  
+**Default:** Enabled  
+**Platforms:** Wii, PC
+
+Controls rendering of blocks with double-sided faces like tall grass and sugar cane.
+
+```c
+#define GFX_DOUBLESIDED
+```
+
+<Accordion title="Impact">
+- **Enabled:** Blocks like tall grass, sugar cane, flowers, and saplings are rendered
+- **Disabled:** These blocks will not be rendered (backfaces culled)
+</Accordion>
+
+<Warning>
+Disabling this will make certain blocks invisible, which significantly affects gameplay.
+</Warning>
+
+### GFX_FANCY_LIQUIDS
+
+**Type:** Toggle define  
+**Default:** Enabled  
+**Platforms:** Wii, PC
+
+Controls liquid rendering quality and transparency.
+
+```c
+#define GFX_FANCY_LIQUIDS
+```
+
+<Accordion title="Impact">
+- **Enabled:** Liquids (water, lava) are transparent and animated
+- **Disabled:** Liquids are opaque and not animated, underwater blocks only render when player is underwater
+</Accordion>
+
+<Tip>
+Disabling fancy liquids can noticeably improve performance on low-end GPUs, especially on the Wii.
+</Tip>
+
+**To disable:**
+```c
+//#define GFX_FANCY_LIQUIDS
+```
+
+### GFX_GUI_SCALE
+
+**Type:** Integer value  
+**Default:** `2`  
+**Minimum:** `1`  
+**Platforms:** Wii, PC
+
+Controls the size of the game interface (HUD, menus, inventory).
+
+```c
+#define GFX_GUI_SCALE 2
+```
+
+<Accordion title="Recommended Values">
+- **640x480 resolution:** `2` (default)
+- **320x240 resolution:** `1`
+- **Higher resolutions:** `3` or `4`
+</Accordion>
+
+**Example configurations:**
+
+<CodeGroup>
+```c Small GUI (320x240)
+#define GFX_GUI_SCALE 1
+```
+
+```c Normal GUI (640x480)
+#define GFX_GUI_SCALE 2
+```
+
+```c Large GUI (1280x720+)
+#define GFX_GUI_SCALE 3
+```
+</CodeGroup>
+
+<Warning>
+Do not set this value below 1, as it will cause rendering issues.
+</Warning>
+
+### GFX_PC_WINDOW_WIDTH
+
+**Type:** Integer value  
+**Default:** `640`  
+**Platforms:** PC only
+
+Sets the default window width for the PC version.
+
+```c
+#define GFX_PC_WINDOW_WIDTH 640
+```
+
+### GFX_PC_WINDOW_HEIGHT
+
+**Type:** Integer value  
+**Default:** `400`  
+**Platforms:** PC only
+
+Sets the default window height for the PC version.
+
+```c
+#define GFX_PC_WINDOW_HEIGHT 400
+```
+
+**Common resolutions:**
+
+<CodeGroup>
+```c Low Resolution (Performance)
+#define GFX_PC_WINDOW_WIDTH 320
+#define GFX_PC_WINDOW_HEIGHT 240
+#define GFX_GUI_SCALE 1
+```
+
+```c Default Resolution
+#define GFX_PC_WINDOW_WIDTH 640
+#define GFX_PC_WINDOW_HEIGHT 400
+#define GFX_GUI_SCALE 2
+```
+
+```c HD Resolution
+#define GFX_PC_WINDOW_WIDTH 1280
+#define GFX_PC_WINDOW_HEIGHT 720
+#define GFX_GUI_SCALE 3
+```
+
+```c Full HD Resolution
+#define GFX_PC_WINDOW_WIDTH 1920
+#define GFX_PC_WINDOW_HEIGHT 1080
+#define GFX_GUI_SCALE 4
+```
+</CodeGroup>
+
+<Note>
+Lower resolutions can greatly improve performance on low-end GPUs. Consider 320x240 for integrated graphics.
+</Note>
+
+### GFX_WIREFRAME
+
+**Type:** Toggle define  
+**Default:** Disabled  
+**Platforms:** PC only
+
+Renders all polygons as wireframes (debugging feature).
+
+```c
+//#define GFX_WIREFRAME
+```
+
+<Warning>
+Enabling wireframe mode will break text and texture rendering and may lower performance. This is only for testing purposes.
+</Warning>
+
+**To enable:**
+```c
+#define GFX_WIREFRAME
+```
+
+## Editing Settings
+
+<Steps>
+  <Step title="Open the settings file">
+    Edit `source/graphics/gfx_settings.h` in your text editor:
+    
+    ```bash
+    nano source/graphics/gfx_settings.h
+    ```
+  </Step>
+  
+  <Step title="Modify settings">
+    To **enable** a setting, ensure the line is uncommented:
+    ```c
+    #define GFX_CLOUDS
+    ```
+    
+    To **disable** a setting, comment it out:
+    ```c
+    //#define GFX_CLOUDS
+    ```
+    
+    For **numeric** settings, change the value:
+    ```c
+    #define GFX_GUI_SCALE 3
+    ```
+  </Step>
+  
+  <Step title="Save and rebuild">
+    Save the file and rebuild the project:
+    
+    <CodeGroup>
+    ```bash Wii
+    make clean
+    make
+    ```
+    
+    ```bash PC
+    cd build_pc
+    rm -rf *
+    cmake ..
+    make
+    ```
+    </CodeGroup>
+  </Step>
+</Steps>
+
+## Performance Presets
+
+### Maximum Performance (Wii)
+
+Optimized for best framerate on Wii hardware:
+
+```c
+//#define GFX_CLOUDS
+#define GFX_DOUBLESIDED
+//#define GFX_FANCY_LIQUIDS
+#define GFX_GUI_SCALE 2
+```
+
+### Balanced (Wii)
+
+Good performance with most visual features:
+
+```c
+#define GFX_CLOUDS
+#define GFX_DOUBLESIDED
+#define GFX_FANCY_LIQUIDS
+#define GFX_GUI_SCALE 2
+```
+
+### Maximum Quality (PC)
+
+Full visual features for capable hardware:
+
+```c
+#define GFX_CLOUDS
+#define GFX_DOUBLESIDED
+#define GFX_FANCY_LIQUIDS
+#define GFX_GUI_SCALE 3
+#define GFX_PC_WINDOW_WIDTH 1280
+#define GFX_PC_WINDOW_HEIGHT 720
+```
+
+### Low-End PC
+
+Optimized for integrated graphics:
+
+```c
+//#define GFX_CLOUDS
+#define GFX_DOUBLESIDED
+//#define GFX_FANCY_LIQUIDS
+#define GFX_GUI_SCALE 1
+#define GFX_PC_WINDOW_WIDTH 320
+#define GFX_PC_WINDOW_HEIGHT 240
+```
+
+## Future Plans
+
+From the source comments:
+
+```c
+// TODO: 240p on Wii?
+```
+
+<Note>
+Runtime video settings may be added in a future version, which would eliminate the need for recompilation when changing settings.
+</Note>
+
+## Troubleshooting
+
+### Settings not applying
+
+Ensure you've cleaned the build directory before rebuilding:
+
+```bash
+make clean  # Wii
+rm -rf build_pc/*  # PC
+```
+
+### Poor performance after enabling features
+
+Try this configuration for better FPS:
+
+```c
+//#define GFX_CLOUDS
+//#define GFX_FANCY_LIQUIDS
+#define GFX_GUI_SCALE 2  // or 1 for lower resolution
+```
+
+### GUI too small or too large
+
+Adjust `GFX_GUI_SCALE` based on your resolution:
+
+- **320x240:** Use `1`
+- **640x480:** Use `2`
+- **1280x720:** Use `3`
+- **1920x1080:** Use `4`

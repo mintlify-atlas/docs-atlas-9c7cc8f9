@@ -1,0 +1,137 @@
+---
+title: Controls
+description: Input controls and keybindings for fCavEX on Wii and PC
+---
+
+## PC Controls
+
+The PC version uses keyboard and mouse controls. The default keybindings are customizable via `config.json`.
+
+### Movement
+
+| Action | Key |
+|--------|-----|
+| Forward | W |
+| Backward | S |
+| Left | A |
+| Right | D |
+| Jump | Space |
+| Sneak | Left Shift |
+
+### Actions
+
+| Action | Key/Button |
+|--------|------------|
+| Break Block | Left Mouse Button |
+| Place Block / Use Item | Right Mouse Button |
+| Scroll Hotbar Left | 1 |
+| Scroll Hotbar Right | 2 |
+| Open Inventory | E |
+| Open Menu | Enter |
+| Take Screenshot | F3 |
+
+### GUI Navigation
+
+| Action | Key |
+|--------|-----|
+| Navigate Up | Up Arrow |
+| Navigate Down | Down Arrow |
+| Navigate Left | Left Arrow |
+| Navigate Right | Right Arrow |
+| Click | Left Mouse Button |
+| Alternate Click | Right Mouse Button |
+
+## Wii Controls
+
+The Wii version supports multiple controller configurations. Controls are customizable via `config.json`.
+
+### Wiimote + Nunchuk
+
+| Action | Button/Control |
+|--------|----------------|
+| Movement | Nunchuk Joystick |
+| Jump | A |
+| Break/Place Block | B / Z |
+| Menu | Plus (+) |
+| Inventory | Minus (-) |
+
+### Classic Controller
+
+| Action | Button/Control |
+|--------|----------------|
+| Movement | Left Joystick |
+| Camera | Right Joystick |
+| Jump | A or B |
+| Break Block | L / ZL |
+| Place Block | R / ZR |
+| Menu | Plus (+) |
+| Inventory | Minus (-) |
+
+### Supported Controllers
+
+fCavEX supports the following Wii controllers:
+- Wiimote (with D-Pad)
+- Nunchuk attachment
+- Classic Controller
+- Guitar Hero 3 controller (experimental)
+
+## Controller Mapping
+
+### Wiimote Button IDs
+
+| Button | Config ID |
+|--------|:---------:|
+| D-Pad Up | 0 |
+| D-Pad Down | 1 |
+| D-Pad Left | 2 |
+| D-Pad Right | 3 |
+| A | 4 |
+| B | 5 |
+| 1 | 6 |
+| 2 | 7 |
+| Plus | 8 |
+| Minus | 9 |
+| Home | 10 |
+
+### Nunchuk Button IDs
+
+| Button | Config ID |
+|--------|:---------:|
+| Z | 100 |
+| C | 101 |
+| Joystick Up | 900 |
+| Joystick Down | 901 |
+| Joystick Left | 902 |
+| Joystick Right | 903 |
+
+### Classic Controller Button IDs
+
+| Button | Config ID |
+|--------|:---------:|
+| D-Pad Up | 200 |
+| D-Pad Down | 201 |
+| D-Pad Left | 202 |
+| D-Pad Right | 203 |
+| A | 204 |
+| B | 205 |
+| X | 206 |
+| Y | 207 |
+| ZL | 208 |
+| ZR | 209 |
+| L Full | 210 |
+| R Full | 211 |
+| Plus | 212 |
+| Minus | 213 |
+| Home | 214 |
+| Left Joystick Up | 910 |
+| Left Joystick Down | 911 |
+| Left Joystick Left | 912 |
+| Left Joystick Right | 913 |
+| Right Joystick Up | 920 |
+| Right Joystick Down | 921 |
+| Right Joystick Left | 922 |
+| Right Joystick Right | 923 |
+
+## Customizing Controls
+
+Controls can be customized by editing the `config.json` file. Each action is mapped to numeric key codes (PC) or controller button IDs (Wii). See the [Configuration](/configuration) page for more details.

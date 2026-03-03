@@ -1,0 +1,112 @@
+---
+title: Differences from CavEX
+description: Key differences between fCavEX and the original CavEX
+---
+
+# Differences from CavEX
+
+[Cave Explorer (CavEX)](https://github.com/xtreme8000/CavEX) by [xtreme8000](https://github.com/xtreme8000) is a Wii homebrew game with the goal to recreate most of the core survival aspects up until Minecraft Beta 1.7.3.
+
+**fCavEX** (forked CavEX) is an experimental fork of CavEX with all kinds of changes and additions.
+
+## Project Goals
+
+### Original CavEX
+- Aims for a 1:1 recreation of Minecraft Beta 1.7.3
+- Focuses on core survival aspects
+- Features beyond Beta 1.7.3 will not be added
+
+### fCavEX
+- Experimental fork with various changes and additions
+- **Not aiming for a 1:1 recreation**
+- Some additions may not be from the original game
+- Some mechanics may work differently
+- Open to features beyond Beta 1.7.3
+
+## Platform Support
+
+### Testing Status
+- **PC**: Fully tested and working
+- **Wii**: May contain bugs (not thoroughly tested)
+
+<Warning>
+For now, fCavEX is primarily tested on PC. There might be bugs when running on the Wii.
+</Warning>
+
+## Save Compatibility
+
+### CavEX
+- Maintains complete save compatibility with Minecraft Beta 1.7.3
+- Can load and save worlds from the original game
+
+### fCavEX
+- **Does not aim for complete save compatibility**
+- Uses incompatible saving systems for certain features
+- Has static limits for some game elements
+
+<AccordionGroup>
+  <Accordion title="Incompatible Save Formats">
+    **Chests**
+    - Use a binary file called `chests.dat` with static limits
+    - Maximum of 256 chests and/or iron chests per world
+    - Chest contents from original CavEX/Minecraft saves cannot be read
+    - Already placed chests need to be broken and placed again to store items
+
+    **Signs**
+    - Use a binary file called `signs.dat` with static limits
+    - Maximum of 256 signs per world
+    - Sign texts from original CavEX/Minecraft saves cannot be read
+    - Already placed signs need to be broken and placed again to keep their text
+  </Accordion>
+
+  <Accordion title="Metadata Differences">
+    Some blocks may use metadata values differently than the original game:
+    - Furnaces use metadata to store fuel values instead of textures
+    - This affects how blocks behave and are saved
+  </Accordion>
+
+  <Accordion title="World Generation">
+    - fCavEX does not have its own world generator yet
+    - Freshly created saves should be compatible
+    - Loading existing worlds may have compatibility issues with new features
+  </Accordion>
+</AccordionGroup>
+
+## Health System
+
+### Original Game/CavEX
+- Player has up to 20 health
+- One heart represents standard health points
+
+### fCavEX
+- Player has up to **160 health**
+- One heart represents **16 health points**
+
+<Note>
+Loading a save from the original game will start with only one heart. This can be fixed by eating food or editing the health value in `level.dat`. This limitation will be removed when fCavEX gets its own world generator.
+</Note>
+
+## Key Feature Differences
+
+For a detailed list of all changes, additions, and removals, see the [Changelog](/dev/changelog).
+
+### Major Additions in fCavEX
+- Compile-time video settings for performance tuning
+- Health, damage, and oxygen systems
+- Iron chests with double capacity
+- Editable signs
+- Food system with health restoration
+- Working doors and trapdoors
+
+### Rendering Changes
+- Optimized leaf rendering (fewer vertices/quads)
+- 2D billboarded item sprites instead of 3D models
+- Optional fast liquids for better performance
+- Experimental 2D trees (WIP)
+
+### Gameplay Changes
+- Furnaces require fuel to operate
+- Chests no longer form double chests
+- Tool durability removed (tools are unbreakable)
+- Different crafting ratios for some blocks
+- Iron doors can be opened by hand (no redstone yet)

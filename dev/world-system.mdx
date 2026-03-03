@@ -1,0 +1,314 @@
+---
+title: World System
+description: World, chunk, and region management architecture
+---
+
+The world system manages the 3D voxel grid that makes up the Minecraft world. It handles chunk storage, spatial queries, and coordinate transformations.
+
+## World Structure
+
+The world is organized hierarchically defined in `source/world.h:32-65`:
+
+```c
+#define WORLD_HEIGHT 128
+#define CHUNK_SIZE 16
+#define COLUMN_HEIGHT ((WORLD_HEIGHT + CHUNK_SIZE - 1) / CHUNK_SIZE)  // 8
+
+enum world_dim {
+    WORLD_DIM_NETHER = -1,
+    WORLD_DIM_OVERWORLD = 0,
+};
+
+struct world_section {
+    uint8_t heightmap[CHUNK_SIZE * CHUNK_SIZE];  // 16x16 heightmap
+    struct chunk* column[COLUMN_HEIGHT];          // 8 vertical chunks
+};
+
+struct world {
+    dict_wsection_t sections;           // Spatial hash of sections
+    struct chunk* world_chunk_cache;    // Last accessed chunk cache
+    ilist_chunks_t render;              // Chunks to render this frame
+    ilist_chunks2_t gpu_busy_chunks;    // Chunks being rendered by GPU
+    ptime_t anim_timer;                 // Animation timer
+    struct stack lighting_updates;      // Pending lighting calculations
+    enum world_dim dimension;           // Current dimension
+};
+```
+
+## Coordinate Systems
+
+fCavEX uses multiple coordinate spaces:
+
+### World Coordinates
+
+Signed 32-bit coordinates spanning the entire world:
+
+```c
+typedef int32_t w_coord_t;
+```
+
+### Chunk Coordinates
+
+Local coordinates within a 16x16x16 chunk:
+
+```c
+typedef uint32_t c_coord_t;  // 0-15
+
+#define W2C_COORD(x) ((x) & CHUNK_SIZE_BITS)  // Extract chunk-local coord
+```
+
+### Section Coordinates
+
+Chunk positions in the world grid:
+
+```c
+#define WCOORD_CHUNK_OFFSET(x) \
+    ((x) < 0 ? (((x) + 1) / CHUNK_SIZE - 1) : (x) / CHUNK_SIZE)
+
+#define SECTION_TO_ID(x, z) \
+    (((int64_t)(z) << 32) | (((int64_t)(x) & 0xFFFFFFFF)))
+```
+
+## World Sections
+
+The world is divided into vertical columns (sections) containing 8 chunks. Sections use a 64-bit ID encoding X and Z coordinates for hash table lookups:
+
+```c
+// Get or create a section
+struct world_section* s = dict_wsection_get(w->sections, SECTION_TO_ID(cx, cz));
+
+// Access chunk within section
+struct chunk* c = s->column[cy];  // cy = 0-7
+```
+
+## Chunk Management
+
+Chunks are reference-counted to handle their lifecycle across multiple systems (rendering, meshing, world storage):
+
+```c
+void chunk_ref(struct chunk* c) {
+    c->reference_count++;
+}
+
+void chunk_unref(struct chunk* c) {
+    c->reference_count--;
+    if(!c->reference_count)
+        chunk_destroy(c);
+}
+```
+
+### Finding Chunks
+
+The world maintains a single-entry cache for fast repeated lookups:
+
+```c
+struct chunk* world_find_chunk(struct world* w, w_coord_t x, 
+                               w_coord_t y, w_coord_t z) {
+    if(y < 0 || y >= WORLD_HEIGHT)
+        return NULL;
+    
+    int cx = WCOORD_CHUNK_OFFSET(x);
+    int cy = y / CHUNK_SIZE;
+    int cz = WCOORD_CHUNK_OFFSET(z);
+    
+    // Check cache first
+    if(w->world_chunk_cache && 
+       cx == w->world_chunk_cache->x / CHUNK_SIZE &&
+       cy == w->world_chunk_cache->y / CHUNK_SIZE &&
+       cz == w->world_chunk_cache->z / CHUNK_SIZE)
+        return w->world_chunk_cache;
+    
+    // Lookup in sections dict
+    struct world_section* res = 
+        dict_wsection_get(w->sections, SECTION_TO_ID(cx, cz));
+    
+    if(res)
+        w->world_chunk_cache = res->column[cy];
+    
+    return res ? res->column[cy] : NULL;
+}
+```
+
+## Block Operations
+
+### Getting Blocks
+
+Block retrieval from `source/world.c:176-188`:
+
+```c
+struct block_data world_get_block(struct world* w, w_coord_t x, 
+                                  w_coord_t y, w_coord_t z) {
+    struct chunk* c = world_find_chunk(w, x, y, z);
+    
+    return c ? 
+        chunk_get_block(c, W2C_COORD(x), W2C_COORD(y), W2C_COORD(z)) :
+        (struct block_data) {
+            .type = (y < WORLD_HEIGHT) ? 1 : 0,  // Stone or air
+            .metadata = 0,
+            .sky_light = (y < WORLD_HEIGHT) ? 0 : 15,
+            .torch_light = 0,
+        };
+}
+```
+
+### Setting Blocks
+
+Block modification with lighting updates from `source/world.c:221-268`:
+
+```c
+void world_set_block(struct world* w, w_coord_t x, w_coord_t y, w_coord_t z,
+                     struct block_data blk, bool light_update) {
+    if(y < 0 || y >= WORLD_HEIGHT)
+        return;
+    
+    if(light_update) {
+        // Queue for lighting recalculation
+        stack_push(&w->lighting_updates,
+                   &(struct world_modification_entry) {
+                       .x = x, .y = y, .z = z, .blk = blk,
+                   });
+    } else {
+        w_coord_t cx = WCOORD_CHUNK_OFFSET(x);
+        w_coord_t cz = WCOORD_CHUNK_OFFSET(z);
+        struct world_section* s = 
+            dict_wsection_get(w->sections, SECTION_TO_ID(cx, cz));
+        struct chunk* c = world_chunk_from_section(w, s, y);
+        
+        if(!c) {
+            // Create new chunk if needed
+            c = malloc(sizeof(struct chunk));
+            chunk_init(c, w, cx * CHUNK_SIZE, cy * CHUNK_SIZE, cz * CHUNK_SIZE);
+            chunk_ref(c);
+            s->column[cy] = c;
+        }
+        
+        chunk_set_block(c, W2C_COORD(x), W2C_COORD(y), W2C_COORD(z), blk);
+        lighting_heightmap_update(s->heightmap, W2C_COORD(x), y, 
+                                  W2C_COORD(z), blk.type);
+    }
+}
+```
+
+## Heightmap
+
+Each section maintains a 16x16 heightmap for fast sky lighting calculations:
+
+```c
+w_coord_t world_get_height(struct world* w, w_coord_t x, w_coord_t z) {
+    w_coord_t cx = WCOORD_CHUNK_OFFSET(x);
+    w_coord_t cz = WCOORD_CHUNK_OFFSET(z);
+    struct world_section* s = 
+        dict_wsection_get(w->sections, SECTION_TO_ID(cx, cz));
+    
+    return s ? s->heightmap[W2C_COORD(x) + W2C_COORD(z) * CHUNK_SIZE] : 0;
+}
+```
+
+## Chunk Visibility
+
+The renderer uses breadth-first search (BFS) with reachability masks for occlusion culling. From `source/world.c:78-149`:
+
+```c
+static void world_bfs(struct world* w, ilist_chunks_t render, 
+                      float x, float y, float z, vec4* planes) {
+    // Start from camera's chunk
+    struct chunk* c_camera = world_find_chunk(w, x, y, z);
+    
+    ilist_chunks_push_back(queue, c_camera);
+    c_camera->tmp_data = (struct chunk_step) {
+        .from = SIDE_MAX,
+        .used_exit_sides = 0,
+        .steps = 0,
+        .visited = true,
+    };
+    
+    while(!ilist_chunks_empty_p(queue)) {
+        struct chunk* current = ilist_chunks_pop_front(queue);
+        ilist_chunks_push_back(render, current);
+        
+        // Check each neighboring chunk
+        for(int s = 0; s < 6; s++) {
+            struct chunk* neigh = world_find_chunk_neighbour(w, current, sides[s]);
+            
+            if(neigh && !neigh->tmp_data.visited &&
+               // Can reach this neighbor through current chunk
+               current->reachable[current->tmp_data.from] & (1 << sides[s]) &&
+               // Within fog distance
+               FOG_DIST_LESS(neigh, FOG_DIST_NO_RENDER) &&
+               // Passes frustum culling
+               glm_aabb_frustum(neigh_bbox, planes)) {
+                ilist_chunks_push_back(queue, neigh);
+                neigh->tmp_data.visited = true;
+            }
+        }
+    }
+}
+```
+
+## Lighting System
+
+Lighting updates are deferred and processed one per frame:
+
+```c
+void world_update_lighting(struct world* w) {
+    if(stack_empty(&w->lighting_updates))
+        return;
+    
+    struct world_modification_entry source;
+    stack_pop(&w->lighting_updates, &source);
+    
+    world_set_block(w, source.x, source.y, source.z, source.blk, false);
+    lighting_update_at_block(source, false, world_light_get_block,
+                            world_light_set_light, w);
+}
+```
+
+## Collision Detection
+
+AABB intersection testing from `source/world.c:574-619`:
+
+```c
+bool world_aabb_intersection(struct world* w, struct AABB* a) {
+    w_coord_t min_x = floorf(a->x1);
+    w_coord_t min_y = floorf(a->y1) - 1;
+    w_coord_t min_z = floorf(a->z1);
+    w_coord_t max_x = ceilf(a->x2) + 1;
+    w_coord_t max_y = ceilf(a->y2) + 1;
+    w_coord_t max_z = ceilf(a->z2) + 1;
+    
+    for(w_coord_t x = min_x; x < max_x; x++) {
+        for(w_coord_t z = min_z; z < max_z; z++) {
+            for(w_coord_t y = min_y; y < max_y; y++) {
+                struct block_data blk = world_get_block(w, x, y, z);
+                
+                if(blocks[blk.type]) {
+                    struct AABB bbox[count];
+                    blocks[blk.type]->getBoundingBox(&blk_info, true, bbox);
+                    
+                    for(size_t k = 0; k < count; k++) {
+                        if(aabb_intersection(a, bbox + k))
+                            return true;
+                    }
+                }
+            }
+        }
+    }
+    return false;
+}
+```
+
+## Dimension Lighting
+
+Different dimensions use different light level curves:
+
+```c
+static const float light_lookup_overworld[16] = {
+    0.05F,  0.067F, 0.085F, 0.106F, 0.129F, 0.156F, 0.186F, 0.221F,
+    0.261F, 0.309F, 0.367F, 0.437F, 0.525F, 0.638F, 0.789F, 1.0F,
+};
+
+static const float light_lookup_nether[16] = {
+    0.1F, 0.116F, 0.133F, 0.153F, 0.175F, 0.2F,   0.229F, 0.262F,
+    0.3F, 0.345F, 0.4F,   0.467F, 0.55F,  0.657F, 0.8F,   1.0F,
+};
+```

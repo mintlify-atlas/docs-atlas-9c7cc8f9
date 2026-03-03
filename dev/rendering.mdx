@@ -1,0 +1,366 @@
+---
+title: Graphics and Rendering
+description: Rendering pipeline and graphics system architecture
+---
+
+fCavEX uses a display list-based rendering system optimized for the Wii's GPU while maintaining compatibility with PC OpenGL.
+
+## Rendering Pipeline Overview
+
+The main render loop from `source/main.c:180-243`:
+
+```c
+// 1. Clear buffers
+gfx_clear_buffers(atmosphere_color[0], atmosphere_color[1], atmosphere_color[2]);
+gfx_fog_color(atmosphere_color[0], atmosphere_color[1], atmosphere_color[2]);
+
+// 2. Setup 3D rendering mode
+gfx_mode_world();
+gfx_matrix_projection(gstate.camera.projection, true);
+gfx_update_light(daytime_brightness(daytime), world_dimension_light(&gstate.world));
+
+// 3. Render sky
+if(gstate.world.dimension == WORLD_DIM_OVERWORLD)
+    gutil_sky_box(gstate.camera.view, daytime_celestial_angle(daytime),
+                  top_plane_color, bottom_plane_color);
+
+// 4. Render world (opaque pass)
+gstate.stats.chunks_rendered = world_render(&gstate.world, &gstate.camera, false);
+
+// 5. Render entities and particles
+gfx_fog(false);
+particle_render(gstate.camera.view, camera_pos, tick_delta);
+entities_client_render(gstate.entities, &gstate.camera, tick_delta);
+gfx_fog(true);
+
+// 6. Render transparent blocks
+world_render(&gstate.world, &gstate.camera, true);
+
+// 7. Render clouds
+gutil_clouds(gstate.camera.view, daytime_brightness(daytime));
+
+// 8. Switch to GUI mode
+gfx_mode_gui();
+
+// 9. Render screen UI
+if(gstate.current_screen->render2D)
+    gstate.current_screen->render2D(gstate.current_screen, gfx_width(), gfx_height());
+```
+
+## Graphics API Abstraction
+
+The platform layer (`source/platform/gfx.h`) provides a consistent API:
+
+```c
+// Matrix operations
+void gfx_matrix_projection(mat4 proj, bool is_perspective);
+void gfx_matrix_modelview(mat4 mv);
+void gfx_matrix_texture(bool enable, mat4 tex);
+
+// Rendering state
+void gfx_mode_world(void);              // 3D perspective mode
+void gfx_mode_gui(void);                // 2D orthographic mode
+void gfx_fog(bool enable);
+void gfx_fog_color(uint8_t r, uint8_t g, uint8_t b);
+void gfx_blending(enum gfx_blend mode);
+void gfx_alpha_test(bool enable);
+void gfx_lighting(bool enable);
+void gfx_texture(bool enable);
+void gfx_cull_func(enum cull_func func);
+
+// Drawing primitives
+void gfx_draw_quads(size_t vertex_count, const int16_t* vertices,
+                    const uint8_t* colors, const uint16_t* texcoords);
+void gfx_draw_lines(size_t vertex_count, const int16_t* vertices,
+                    const uint8_t* colors);
+
+// Textures
+void gfx_bind_texture(struct tex_gfx* tex);
+
+// Lighting
+void gfx_update_light(float daytime, const float* light_lookup);
+float gfx_lookup_light(uint8_t light);
+```
+
+## Display Lists
+
+Chunk meshes are stored as display lists for efficient GPU rendering:
+
+```c
+struct displaylist {
+    void* buffer;           // Platform-specific GPU buffer
+    size_t capacity;
+    size_t size;
+    uint8_t vertex_size;    // Bytes per vertex
+};
+
+void displaylist_init(struct displaylist* d, size_t capacity, 
+                      uint8_t vertex_size);
+void displaylist_finalize(struct displaylist* d, size_t vertex_count);
+void displaylist_render(struct displaylist* d);
+void displaylist_destroy(struct displaylist* d);
+```
+
+## Chunk Rendering
+
+Each chunk has 13 display lists for different render passes:
+
+```c
+struct chunk {
+    mat4 model_view;                // Cached modelview matrix
+    w_coord_t x, y, z;             // World position
+    uint8_t* blocks;               // Block data
+    struct displaylist mesh[13];   // Geometry display lists
+    bool has_displist[13];         // Which lists have data
+    bool rebuild_displist;         // Needs remeshing
+    // ...
+};
+```
+
+Display list indices:
+- 0-5: Opaque blocks by side (top, bottom, left, right, front, back)
+- 6-11: Transparent blocks by side
+- 12: Double-sided blocks (grass, fire)
+
+### World Rendering
+
+From `source/world.c:521-572`:
+
+```c
+size_t world_render(struct world* w, struct camera* c, bool pass) {
+    size_t in_view = 0;
+    
+    gfx_fog(true);
+    gfx_lighting(true);
+    
+    if(!pass) {
+        // Opaque pass
+        gfx_bind_texture(&texture_terrain);
+        gfx_blending(MODE_OFF);
+        gfx_alpha_test(true);
+        
+        ilist_chunks_it_t it;
+        ilist_chunks_it(it, w->render);
+        
+        while(!ilist_chunks_end_p(it)) {
+            chunk_render(ilist_chunks_ref(it), false, c->x, c->y, c->z);
+            in_view++;
+            ilist_chunks_next(it);
+        }
+    } else {
+        // Transparent pass with animated texture
+        gfx_alpha_test(false);
+        gfx_blending(MODE_BLEND);
+        gfx_write_buffers(false, true, true);  // Depth only first
+        
+        mat4 matrix_anim;
+        int anim = (time_diff_ms(w->anim_timer, time_get()) * 7 / 800) % 28;
+        glm_translate_make(matrix_anim,
+            (vec3){(anim / 14) * 0.4921875F, (anim % 14) * 0.0703125F, 0.0F});
+        
+        gfx_matrix_texture(true, matrix_anim);
+        gfx_bind_texture(&texture_anim);
+        
+        // Two passes: depth then color+depth
+        for(int t_pass = 0; t_pass < 2; t_pass++) {
+            if(t_pass == 1)
+                gfx_write_buffers(true, false, true);
+            
+            ilist_chunks_it(it, w->render);
+            while(!ilist_chunks_end_p(it)) {
+                chunk_render(ilist_chunks_ref(it), true, c->x, c->y, c->z);
+                ilist_chunks_next(it);
+            }
+        }
+        
+        gfx_matrix_texture(false, NULL);
+        gfx_write_buffers(true, true, true);
+    }
+    
+    return in_view;
+}
+```
+
+## Chunk Meshing
+
+The chunk mesher runs on a background thread and generates optimized geometry from block data.
+
+### Mesh Generation Process
+
+From `source/chunk_mesher.c:264-476`:
+
+```c
+static void chunk_mesher_rebuild(struct block_data* bd, w_coord_t cx,
+                                 w_coord_t cy, w_coord_t cz,
+                                 struct displaylist* d, bool count_only,
+                                 size_t* vertices) {
+    // 1. Pre-calculate vertex lighting for all corners
+    uint8_t* light_data = malloc((CHUNK_SIZE + 2)^3 * 3);
+    chunk_mesher_vertex_light(bd, light_data);
+    
+    // 2. Iterate all blocks in chunk
+    for(c_coord_t y = 0; y < CHUNK_SIZE; y++) {
+        for(c_coord_t z = 0; z < CHUNK_SIZE; z++) {
+            for(c_coord_t x = 0; x < CHUNK_SIZE; x++) {
+                struct block_data local = BLK_DATA(bd, x, y, z);
+                
+                if(blocks[local.type]) {
+                    // 3. Get neighbor blocks
+                    struct block_data neighbours[6];
+                    for(int k = 0; k < SIDE_MAX; k++) {
+                        // ... fetch neighbors
+                    }
+                    
+                    // 4. Test each face for visibility
+                    for(int k = 0; k < SIDE_MAX; k++) {
+                        enum side s = (enum side)k;
+                        bool face_visible = true;
+                        
+                        if(blocks[neighbours[k].type]) {
+                            // Face occlusion test
+                            struct face_occlusion* a = 
+                                blocks[local.type]->getSideMask(&local_info, s);
+                            struct face_occlusion* b = 
+                                blocks[neighbours[k].type]->getSideMask(
+                                    neighbours_info + k, blocks_side_opposite(s));
+                            face_visible = face_occlusion_test(a, b);
+                        }
+                        
+                        // 5. Render visible faces
+                        if(face_visible) {
+                            int dp_index = blocks[local.type]->transparent ? k + 6 : k;
+                            vertices[dp_index] += blocks[local.type]->renderBlock(
+                                d + dp_index, &local_info, s, 
+                                neighbours_info + k, vertex_light, count_only) * 4;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    free(light_data);
+}
+```
+
+### Vertex Lighting
+
+Smooth vertex lighting averages light from surrounding blocks:
+
+```c
+static void chunk_mesher_vertex_light(struct block_data* bd,
+                                      uint8_t* light_data) {
+    const int shade_table[5] = {0, 5, 3, 1, 0};
+    
+    for(c_coord_t y = 0; y < CHUNK_SIZE + 2; y++) {
+        for(c_coord_t z = 0; z < CHUNK_SIZE + 2; z++) {
+            for(c_coord_t x = 0; x < CHUNK_SIZE + 2; x++) {
+                // Sample 4 adjacent blocks for each corner
+                struct block_data b1[4] = { /* ... */ };
+                
+                int sum_sky = 0, sum_torch = 0, count = 0;
+                for(int k = 0; k < 4; k++) {
+                    if(!blocks[b1[k].type] || 
+                       blocks[b1[k].type]->can_see_through) {
+                        sum_sky += b1[k].sky_light;
+                        sum_torch += b1[k].torch_light;
+                        count++;
+                    }
+                }
+                
+                // Average and apply ambient occlusion
+                sum_torch = MAX(sum_torch / count - shade_table[count], 0);
+                sum_sky = MAX(sum_sky / count - shade_table[count], 0);
+                
+                light_data[index] = (sum_torch << 4) | sum_sky;
+            }
+        }
+    }
+}
+```
+
+## Face Occlusion
+
+Blocks can have partial faces (slabs, stairs, fences) requiring detailed occlusion testing:
+
+```c
+struct face_occlusion {
+    uint64_t mask;  // 8x8 grid of coverage bits
+};
+
+bool face_occlusion_test(struct face_occlusion* a, struct face_occlusion* b) {
+    // Returns true if 'a' is visible through 'b'
+    return (a->mask & b->mask) != a->mask;
+}
+```
+
+## Camera and Frustum Culling
+
+Camera setup with frustum plane extraction:
+
+```c
+void world_pre_render(struct world* w, struct camera* c, mat4 view) {
+    // Extract frustum planes for culling
+    glm_frustum_planes(c->projection, c->frustum_planes);
+    
+    // BFS traversal with frustum and fog culling
+    ilist_chunks_init(w->render);
+    world_bfs(w, w->render, c->x, c->y, c->z, c->frustum_planes);
+    
+    // Pre-calculate modelview matrices
+    ilist_chunks_it_t it;
+    ilist_chunks_it(it, w->render);
+    while(!ilist_chunks_end_p(it)) {
+        struct chunk* c = ilist_chunks_ref(it);
+        chunk_pre_render(c, view, has_fog);
+        ilist_chunks_next(it);
+    }
+}
+```
+
+## Texture Management
+
+Textures use an atlas system:
+
+```c
+// Texture coordinates are pre-calculated indices
+#define TEX_OFFSET(x) ((x) * 18 + 3)
+
+uint8_t tex_atlas_lookup(enum texture_atlas_index idx);
+```
+
+## Lighting Model
+
+Two light sources combine at each vertex:
+- **Sky light**: 0-15, affected by time of day
+- **Torch light**: 0-15, always full brightness
+
+```c
+void gfx_update_light(float daytime, const float* light_lookup) {
+    // Updates GPU light lookup table
+    // Combines daytime brightness with light level
+}
+
+float gfx_lookup_light(uint8_t light) {
+    uint8_t sky = light & 0xF;
+    uint8_t torch = light >> 4;
+    return max(sky_brightness * light_lookup[sky], light_lookup[torch]);
+}
+```
+
+## GUI Rendering
+
+GUI uses orthographic projection:
+
+```c
+void gfx_mode_gui(void) {
+    // Switch to 2D orthographic projection
+    // Disable fog and lighting
+    // Enable alpha blending
+}
+
+void gutil_texquad(int x, int y, int u, int v, int w, int h,
+                   int screen_w, int screen_h) {
+    // Render textured quad for GUI elements
+}
+```
